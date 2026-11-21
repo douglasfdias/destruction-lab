@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Destruction Lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#12162b">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --y: #FFC531; --o: #FF8A2A; --panel: rgba(10,13,28,.72); --txt2: #c9cde0; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #12162b; font-family: 'Chakra Petch', system-ui, sans-serif; color: #fff; touch-action: none; overscroll-behavior: none; }
+  #game, #game canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #touch { position: fixed; inset: 0; z-index: 2; }
+  #hud { position: fixed; inset: 0; z-index: 3; pointer-events: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #hud .btn, #hud button, .panel { pointer-events: auto; }
+  .btn { border: none; background: var(--panel); color: #fff; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-family: inherit; font-weight: 700; cursor: pointer; }
+  .btn svg { width: 24px; height: 24px; }
+  .btn.on { outline: 2px solid var(--y); color: var(--y); }
+  #logo { position: absolute; left: calc(16px + env(safe-area-inset-left)); top: 12px; }
+  #logo .t { font-family: Bungee, sans-serif; font-size: 18px; color: var(--y); letter-spacing: .5px; }
+  #logo .s { font-size: 12px; font-weight: 600; color: var(--txt2); }
+  #score { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: min(340px, 38vw); background: var(--panel); border-radius: 14px; padding: 8px 12px; display: flex; flex-direction: column; gap: 5px; }
+  #score .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  #score .lbl { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--txt2); }
+  #money { font-family: Bungee, sans-serif; font-size: 18px; white-space: nowrap; }
+  #barw { height: 8px; border-radius: 5px; background: #2b3150; overflow: hidden; }
+  #bar { height: 100%; width: 0; background: var(--o); transition: width .25s; }
+  #pct { font-size: 11px; font-weight: 600; color: var(--txt2); }
+  #tr { position: absolute; right: calc(12px + env(safe-area-inset-right)); top: 10px; display: flex; gap: 8px; }
+  #tr .btn { width: 46px; height: 46px; }
+  #cross { position: absolute; left: 50%; top: 50%; width: 36px; height: 36px; transform: translate(-50%,-50%); }
+  #cross i { position: absolute; background: #fff; box-shadow: 0 0 2px rgba(0,0,0,.8); }
+  #cross .a { left: 17px; top: 0; width: 2px; height: 11px; } #cross .b { left: 17px; bottom: 0; width: 2px; height: 11px; }
+  #cross .c { top: 17px; left: 0; height: 2px; width: 11px; } #cross .d { top: 17px; right: 0; height: 2px; width: 11px; }
+  #cross .e { left: 16px; top: 16px; width: 4px; height: 4px; border-radius: 2px; background: var(--o); }
+  #scope { display: none; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, transparent 0, transparent 34vh, rgba(0,0,0,.92) 35vh); }
+  #scope::before, #scope::after { content: ''; position: absolute; background: rgba(0,0,0,.85); }
+  #scope::before { left: 50%; top: 15vh; bottom: 15vh; width: 1px; } #scope::after { top: 50%; left: 30vw; right: 30vw; height: 1px; }
+  #joy { position: absolute; left: calc(40px + env(safe-area-inset-left)); bottom: 34px; width: 150px; height: 150px; border-radius: 75px; background: rgba(10,13,28,.4); border: 2px solid rgba(255,255,255,.3); display: flex; align-items: center; justify-content: center; transition: opacity .2s; opacity: .8; }
+  #joy.active { opacity: 1; }
+  #knob { width: 62px; height: 62px; border-radius: 31px; background: rgba(255,255,255,.85); }
+  #wcard { position: absolute; left: 50%; transform: translateX(-50%); bottom: 10px; width: min(360px, 40vw); height: 62px; background: rgba(10,13,28,.82); border-radius: 14px; padding: 6px; display: flex; align-items: center; gap: 6px; }
+  #wcard .btn { width: 46px; height: 50px; flex: none; background: #2b3150; border-radius: 10px; }
+  #arsenal { flex: 1; min-width: 0; height: 50px; border: none; background: transparent; color: #fff; font-family: inherit; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; padding: 0 4px; text-align: left; }
+  #wtop { display: flex; align-items: center; gap: 8px; width: 100%; }
+  #wlevel { font-size: 10px; font-weight: 700; letter-spacing: 1px; padding: 1px 6px; border-radius: 5px; color: #1a1a1a; flex: none; }
+  #wname { font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #wstatus { font-size: 11px; font-weight: 600; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  #ammo { position: absolute; right: calc(172px + env(safe-area-inset-right)); bottom: 84px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-shadow: 0 2px 4px rgba(0,0,0,.7); }
+  #ammo .n { font-family: Bungee, sans-serif; font-size: 30px; line-height: 1; }
+  #ammo .n small { font-size: 15px; color: var(--txt2); }
+  #ammo .n.empty { color: #ff6a4a; }
+  #pips { display: flex; gap: 3px; }
+  #pips i { width: 7px; height: 16px; border-radius: 2px; background: var(--y); box-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  #pips i.off { background: rgba(255,255,255,.2); }
+  #pips.shell i { width: 10px; height: 18px; background: #d8392b; border-top: 4px solid #c9a24a; }
+  #pips.shell i.off { background: rgba(255,255,255,.2); border-top-color: rgba(255,255,255,.25); }
+  #pips.big i { width: 14px; height: 22px; border-radius: 3px; }
+  #fire { position: absolute; right: calc(24px + env(safe-area-inset-right)); bottom: 24px; width: 136px; height: 136px; border-radius: 68px; border: 5px solid #fff; background: #e2401c; box-shadow: 0 8px 0 #8a2410; color: #fff; font-family: Bungee, sans-serif; font-size: 18px; }
+  #fire.down { transform: translateY(5px); box-shadow: 0 3px 0 #8a2410; background: #ff5a32; }
+  #zoom { position: absolute; right: calc(46px + env(safe-area-inset-right)); bottom: 178px; width: 58px; height: 58px; border-radius: 29px; border: 2px solid rgba(255,255,255,.5); }
+  #jump { position: absolute; right: calc(116px + env(safe-area-inset-right)); bottom: 178px; width: 52px; height: 52px; border-radius: 26px; border: 2px solid rgba(255,255,255,.35); }
+  #toasts { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .toast { padding: 6px 14px; border-radius: 10px; background: var(--y); color: #1a1a1a; font-family: Bungee, sans-serif; font-size: 17px; box-shadow: 0 5px 0 #a87a00; transform: rotate(-3deg); animation: pop .25s ease-out; transition: opacity .5s, transform .5s; white-space: nowrap; }
+  .toast.out { opacity: 0; transform: rotate(-3deg) translateY(-14px); }
+  @keyframes pop { from { transform: rotate(-3deg) scale(.4); } to { transform: rotate(-3deg) scale(1); } }
+  #floaters { position: absolute; inset: 0; overflow: hidden; }
+  .floater { position: absolute; left: 0; top: 0; font-family: Bungee, sans-serif; font-size: 19px; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.6), 0 0 8px rgba(0,0,0,.4); white-space: nowrap; will-change: transform; }
+  .panel { position: absolute; inset: 0; background: rgba(8,10,22,.88); display: none; align-items: center; justify-content: center; z-index: 5; }
+  .sheet { width: min(760px, 92vw); max-height: 90vh; overflow: auto; background: #1c2240; border-radius: 18px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .sheet h2 { margin: 0; font-family: Bungee, sans-serif; font-weight: 400; font-size: 22px; color: var(--y); display: flex; justify-content: space-between; align-items: center; }
+  #arsenal-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; }
+  .wcard { position: relative; height: 84px; border-radius: 12px; border: 2px solid #2b3150; background: #181d36; color: #fff; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 9px 10px; font-family: inherit; text-align: left; }
+  .wcard.on { border-color: var(--y); background: #232947; }
+  .wcard .badge { font-size: 10px; font-weight: 700; letter-spacing: 1px; padding: 2px 7px; border-radius: 6px; color: #1a1a1a; }
+  .wcard .wname { font-size: 16px; font-weight: 700; }
+  .wcard .wkey { position: absolute; right: 9px; top: 7px; font-size: 11px; color: #8088a8; }
+  .close { width: 44px; height: 44px; border-radius: 12px; background: #2b3150; }
+  .setrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; font-weight: 600; }
+  #qrow { display: flex; gap: 8px; }
+  .qbtn { height: 42px; padding: 0 16px; border-radius: 10px; border: 2px solid #2b3150; background: #181d36; color: #fff; font-family: inherit; font-weight: 700; }
+  .qbtn.on { border-color: var(--y); color: var(--y); }
+  input[type=checkbox] { width: 26px; height: 26px; accent-color: #FFC531; }
+  input[type=range] { width: 200px; accent-color: #FFC531; }
+  .note { font-size: 12px; color: #9aa0bd; line-height: 1.4; }
+  #start { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, rgba(18,22,43,.35), rgba(18,22,43,.85)); }
+  #start .box { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 20px; }
+  #start h1 { margin: 0; font-family: Bungee, sans-serif; font-weight: 400; font-size: clamp(30px, 6vw, 56px); color: var(--y); text-shadow: 0 5px 0 #8a5a00; }
+  #start p { margin: 0; color: #e3e6f3; font-size: 15px; font-weight: 600; max-width: 560px; }
+  #start-btn { margin-top: 6px; height: 60px; padding: 0 32px; border-radius: 14px; border: none; background: var(--y); color: #1a1a1a; font-family: Bungee, sans-serif; font-size: 20px; box-shadow: 0 6px 0 #a87a00; }
+  #start .tips { font-size: 12px; color: #b7bdd8; }
+  #rotate { position: fixed; inset: 0; z-index: 20; display: none; flex-direction: column; gap: 14px; align-items: center; justify-content: center; background: #12162b; font-size: 18px; font-weight: 700; text-align: center; padding: 24px; }
+  /* ---- duel ---- */
+  #duelhud { display: none; position: absolute; inset: 0; }
+  #turn { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 10px; display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border-radius: 14px; background: var(--panel); border-left: 4px solid var(--o); }
+  #turn-timer { width: 44px; height: 44px; border-radius: 22px; border: 3px solid var(--o); display: flex; align-items: center; justify-content: center; font-family: Bungee, sans-serif; font-size: 16px; }
+  #turn-team { font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+  #turn-boss { font-size: 16px; font-weight: 700; }
+  #turn-round { font-size: 11px; font-weight: 600; color: var(--txt2); }
+  #bosses { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: min(400px, 40vw); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 8px 12px; border-radius: 14px; background: var(--panel); }
+  .bcol { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .bl { font-size: 11px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hpw { height: 8px; border-radius: 4px; background: #2b3150; overflow: hidden; }
+  .hp { height: 100%; transition: width .3s; }
+  .bn { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; font-weight: 600; color: var(--txt2); white-space: nowrap; }
+  #wind { position: absolute; right: calc(232px + env(safe-area-inset-right)); top: 10px; height: 46px; padding: 0 12px; border-radius: 14px; background: var(--panel); display: flex; align-items: center; gap: 8px; }
+  #wind .wl { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--txt2); }
+  #wind-a { font-size: 16px; color: #8fd3ff; letter-spacing: -2px; }
+  #wind-v { font-size: 14px; font-weight: 700; }
+  #turninfo { position: absolute; left: 50%; transform: translateX(-50%); bottom: 80px; padding: 4px 12px; border-radius: 10px; background: rgba(10,13,28,.75); font-size: 12px; font-weight: 700; white-space: nowrap; }
+  #pass { position: absolute; right: calc(24px + env(safe-area-inset-right)); bottom: 248px; height: 40px; padding: 0 14px; font-size: 13px; border: 2px solid rgba(255,255,255,.35); }
+  #banner { position: fixed; inset: 0; z-index: 6; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 4px; pointer-events: none; }
+  #banner .bt { font-family: Bungee, sans-serif; font-size: clamp(20px, 3.6vw, 38px); max-width: 90vw; color: #fff; text-shadow: 0 4px 0 rgba(0,0,0,.45), 0 0 24px rgba(0,0,0,.4); text-align: center; }
+  #banner .bs { font-size: 16px; font-weight: 700; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
+  #banner.in .bt { animation: bin .35s ease-out; }
+  #banner.out { opacity: 0; transition: opacity .35s; }
+  @keyframes bin { from { transform: scale(1.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .overlay { position: fixed; inset: 0; z-index: 12; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(8,10,22,.9); text-align: center; padding: 20px; pointer-events: auto; }
+  .overlay .ht, .overlay .rt { font-family: Bungee, sans-serif; font-size: clamp(24px, 4.5vw, 40px); }
+  .overlay .hs, .overlay .rs { font-size: 16px; font-weight: 600; color: #e3e6f3; }
+  .overlay .rst { font-size: 13px; color: var(--txt2); display: flex; flex-direction: column; gap: 4px; }
+  .overlay .rb { display: flex; gap: 12px; margin-top: 8px; }
+  .bigbtn { height: 56px; padding: 0 28px; border-radius: 14px; border: none; background: var(--y); color: #1a1a1a; font-family: Bungee, sans-serif; font-size: 18px; box-shadow: 0 6px 0 #a87a00; }
+  .bigbtn.alt { background: #2b3150; color: #fff; box-shadow: 0 6px 0 #161a30; }
+  .modes { display: flex; gap: 14px; margin-top: 6px; flex-wrap: wrap; justify-content: center; }
+  .mode { width: 230px; padding: 14px 16px; border-radius: 16px; border: 3px solid transparent; background: var(--y); color: #1a1a1a; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; font-family: inherit; text-align: left; box-shadow: 0 6px 0 #a87a00; }
+  .mode b { font-family: Bungee, sans-serif; font-weight: 400; font-size: 20px; }
+  .mode span { font-size: 13px; font-weight: 600; }
+  .mode.duel { background: var(--o); box-shadow: 0 6px 0 #9a4a10; }
+  #duelopts { display: none; flex-direction: column; align-items: center; gap: 10px; }
+  #duelopts .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .opt { height: 50px; padding: 0 20px; border-radius: 12px; border: none; background: #2b3150; color: #fff; font-family: inherit; font-weight: 700; font-size: 15px; }
+  .opt.hl { background: var(--y); color: #1a1a1a; }
+  .wcard .stock { font-size: 11px; font-weight: 600; color: #9aa0bd; }
+  .wcard.empty { opacity: .35; }
+  @media (max-height: 420px) {
+    #ammo { right: calc(144px + env(safe-area-inset-right)); bottom: 70px; } #ammo .n { font-size: 24px; }
+    #fire { width: 112px; height: 112px; font-size: 16px; }
+    #zoom { bottom: 148px; right: calc(36px + env(safe-area-inset-right)); } #jump { bottom: 148px; right: calc(104px + env(safe-area-inset-right)); }
+    #joy { width: 130px; height: 130px; bottom: 22px; }
+  }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="touch"></div>
+<div id="hud" style="visibility:hidden">
+  <div id="logo"><div class="t">DESTRUCTION LAB</div><div class="s">Laboratório · Casa de 2 andares</div></div>
+  <div id="score">
+    <div class="row"><span class="lbl">PREJUÍZO CAUSADO</span><span id="money">R$ 0</span></div>
+    <div id="barw"><div id="bar"></div></div>
+    <div class="row"><span id="pct">Destruição 0%</span></div>
+  </div>
+  <div id="tr">
+    <button class="btn" id="slow" aria-label="Câmera lenta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/></svg></button>
+    <button class="btn" id="reset" aria-label="Reiniciar cenário"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+    <button class="btn" id="fullscreen" aria-label="Tela cheia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    <button class="btn" id="settings" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button>
+  </div>
+  <div id="cross"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="e"></i></div>
+  <div id="scope"></div>
+  <div id="toasts"></div>
+  <div id="floaters"></div>
+  <div id="joy"><div id="knob"></div></div>
+  <div id="wcard">
+    <button class="btn" id="prev" aria-label="Arma anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button id="arsenal" aria-label="Abrir arsenal"><span id="wtop"><span id="wlevel">NÍVEL 1</span><span id="wname">Pedra</span></span><span id="wstatus"></span></button>
+    <button class="btn" id="next" aria-label="Próxima arma"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <button class="btn" id="jump" aria-label="Pular"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 19V6M6 11l6-6 6 6"/></svg></button>
+  <button class="btn" id="zoom" aria-label="Mirar com zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+  <div id="duelhud">
+    <div id="turn"><div id="turn-timer">45</div><div><div id="turn-team"></div><div id="turn-boss"></div><div id="turn-round"></div></div></div>
+    <div id="bosses">
+      <div class="bcol"><div class="bl" style="color:#FF8A2A">DONA MARRETA</div><div class="hpw"><div id="hp0" class="hp" style="background:#FF8A2A;width:100%"></div></div><div class="bn"><span id="hpn0">100</span><span id="fort0"></span></div></div>
+      <div class="bcol"><div class="bl" style="color:#5B8CFF">SEU BETÃO</div><div class="hpw"><div id="hp1" class="hp" style="background:#5B8CFF;width:100%"></div></div><div class="bn"><span id="hpn1">100</span><span id="fort1"></span></div></div>
+    </div>
+    <div id="wind"><span class="wl">VENTO</span><span id="wind-a">—</span><span id="wind-v">0 km/h</span></div>
+    <div id="turninfo"></div>
+    <button class="btn" id="pass">Passar turno</button>
+  </div>
+  <div id="ammo"><div class="n" id="ammo-n">∞</div><div id="pips"></div></div>
+  <button class="btn" id="fire">FOGO</button>
+
+  <div class="panel" id="arsenal-panel">
+    <div class="sheet">
+      <h2>ARSENAL · 1º TESTE <button class="btn close" id="arsenal-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></h2>
+      <div id="arsenal-grid"></div>
+      <div class="note">As outras 14 armas (tomate, galinha-bomba, bigorna, raio Tesla, buraco negro…) entram depois que este teste estiver aprovado.</div>
+    </div>
+  </div>
+  <div class="panel" id="settings-panel">
+    <div class="sheet">
+      <h2>AJUSTES <button class="btn close" id="settings-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></h2>
+      <div class="setrow"><span>Qualidade gráfica</span><div id="qrow"></div></div>
+      <div class="setrow"><span>Modo de jogo</span><button class="qbtn" id="to-menu">Voltar ao menu</button></div>
+      <div class="setrow"><label for="vib">Vibração</label><input type="checkbox" id="vib"></div>
+      <div class="setrow"><label for="snd">Som</label><input type="checkbox" id="snd"></div>
+      <div class="setrow"><label for="sens">Sensibilidade da mira</label><input type="range" id="sens" min="0.4" max="2.2" step="0.1"></div>
+      <div class="note">Qualidade Baixa: menos destroços simultâneos e sem sombras, para celulares mais simples. O jogo ajusta sozinho nos primeiros segundos se perceber que está pesado.<br>Sons: efeitos reais em domínio público (CC0) — coleções Free-SFX e Meta Open Sound.</div>
+    </div>
+  </div>
+</div>
+<div id="start">
+  <div class="box">
+    <h1>DESTRUCTION LAB</h1>
+    <p>Fase 2 de teste. Laboratório: uma casa para destruir à vontade. Duelo: Marretões × Betoneiras, cada um no seu forte, por turnos.</p>
+    <div class="modes" id="modes">
+      <button class="mode" id="m-lab"><b>LABORATÓRIO</b><span>Destrua tudo à vontade, sem regras</span></button>
+      <button class="mode duel" id="m-duel"><b>DUELO</b><span>Forte contra forte, por turnos. Derrube o chefe rival</span></button>
+    </div>
+    <div id="duelopts">
+      <div style="font-weight:700">Contra o computador</div>
+      <div class="row"><button class="opt" data-diff="facil">Fácil</button><button class="opt hl" data-diff="medio">Médio</button><button class="opt" data-diff="dificil">Difícil</button></div>
+      <div class="row"><button class="opt" id="two-players">2 jogadores no mesmo celular</button><button class="opt" id="duel-back">Voltar</button></div>
+    </div>
+    <div id="loading" style="display:none;font-weight:700">Carregando sons…</div>
+    <div class="tips">Esquerda: andar · Direita: arrastar para mirar · Botão FOGO: atirar (segure no estilingue, pedra e granada)<br>No computador: WASD anda · Setas miram (Ctrl = mira fina) · F ou Enter atira (segure para carregar) · Espaço pula<br>Mouse: clique atira · botão direito + arrastar mira · Q/E ou 1–8 trocam arma · Z zoom · T câmera lenta · Shift corre</div>
+  </div>
+</div>
+<div id="banner"><div class="bt"></div><div class="bs"></div></div>
+<div class="overlay" id="handoff"><div class="ht"></div><div class="hs"></div><button class="bigbtn" id="handoff-ok">ESTOU PRONTO</button></div>
+<div class="overlay" id="result"><div class="rt"></div><div class="rs"></div><div class="rst"></div><div class="rb"><button class="bigbtn" id="r-again">REVANCHE</button><button class="bigbtn alt" id="r-menu">MENU</button></div></div>
+<div id="rotate">
+  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#FFC531" stroke-width="1.8" stroke-linecap="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M3 12a9 9 0 0 0 4 7.5M21 12a9 9 0 0 0-4-7.5"/></svg>
+  Gire o celular para jogar na horizontal
+</div>
+<script type="module" src="./js/main.js"></script>
+<script>
+  // installable web app: only when running as its own site (not inside an embedded preview)
+  try { if (window.top === window && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js'); } catch (e) {}
+</script>
+</body>
+</html>
