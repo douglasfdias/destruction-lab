@@ -23,7 +23,7 @@ export const TEAMS = [
 
 // shots per turn and stock per match
 export const RULES = {
-  pedra: { shots: 2, stock: Infinity }, estilingue: { shots: 2, stock: Infinity }, pistola: { shots: 6, stock: Infinity },
+  pedra: { shots: 2, stock: Infinity }, estilingue: { shots: 2, stock: Infinity }, pistola: { shots: 6, stock: Infinity }, smg: { shots: 20, stock: 4 },
   shotgun: { shots: 2, stock: Infinity }, rifle50: { shots: 1, stock: 4 }, granada: { shots: 1, stock: 3 },
   canhao: { shots: 1, stock: 3 }, rpg: { shots: 1, stock: 2 },
 };
@@ -32,7 +32,7 @@ export const RULES = {
 const AI_SPEC = {
   pedra: { kind: 'arc', speed: 26, up: 2.5, grav: -13, wind: 0.35, hold: 0.75 },
   estilingue: { kind: 'arc', speed: 52, up: 0, grav: -9.81, wind: 0.25, hold: 1.15 },
-  pistola: { kind: 'ray', hold: 0.05 }, shotgun: { kind: 'ray', hold: 0.05 }, rifle50: { kind: 'ray', hold: 0.05 },
+  pistola: { kind: 'ray', hold: 0.05 }, smg: { kind: 'ray', hold: 2.4 }, shotgun: { kind: 'ray', hold: 0.05 }, rifle50: { kind: 'ray', hold: 0.05 },
   granada: { kind: 'arc', speed: 17, up: 3.5, grav: -13, wind: 0.3, hold: 0.45 },
   canhao: { kind: 'arc', speed: 62, up: 1.5, grav: -13, wind: 0.08, hold: 0.05 },
   rpg: { kind: 'rocket', hold: 0.05 },
@@ -387,7 +387,8 @@ export class Duel {
       if (ai.t < 0.6) return;
       const opts = [];
       const add = (i, wgt) => { const id = b.weapons[i].id; if (b.stock[id] > 0) opts.push([i, wgt]); };
-      add(7, 5); add(6, 5); add(5, 3); add(4, 3); add(3, 2); add(2, 1.5); add(1, 0.8); add(0, 0.4);
+      const W = { rpg: 5, canhao: 5, granada: 3, rifle50: 3, shotgun: 2, smg: 2.2, pistola: 1.5, estilingue: 0.8, pedra: 0.4 };
+      for (let i = 0; i < b.weapons.length; i++) add(i, W[b.weapons[i].id] || 1);
       let tot = opts.reduce((a, o) => a + o[1], 0), r = Math.random() * tot, pick = opts[0][0];
       for (const [i, wg] of opts) { r -= wg; if (r <= 0) { pick = i; break; } }
       g.selectWeapon(pick, true);

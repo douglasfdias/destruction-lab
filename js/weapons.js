@@ -1,4 +1,4 @@
-// The 8 test weapons: view models, preparation rituals, firing, reloads.
+// The test weapons: view models, preparation rituals, firing, reloads.
 import * as THREE from '../lib/three.module.min.js';
 
 const R = (a, b) => a + Math.random() * (b - a);
@@ -334,6 +334,102 @@ class Pistol extends Weapon {
     this.slide.position.z = -0.07 + sb;
     if (this.ready) this.status = `${this.rounds}/12`;
   }
+}
+
+// ---------------- 3b. Submetralhadora (automática) ----------------
+class SMG extends Weapon {
+  constructor(game) {
+    super(game, { id: 'smg', name: 'Submetralhadora', level: 2, hint: 'Segure para rajada' });
+    const g = this.gun = new THREE.Group();
+    this.body = box(0.05, 0.06, 0.24, GUNMETAL, 0, 0.03, -0.08, { m: 0.55, r: 0.45 });
+    const top = box(0.04, 0.012, 0.2, 0x1f2125, 0, 0.066, -0.08);
+    const barrel = cyl(0.011, 0.011, 0.09, 0x1a1b1f, 0, 0.035, -0.24, 'z', { m: 0.7, r: 0.35 });
+    const sight = box(0.012, 0.022, 0.012, 0x1a1b1f, 0, 0.08, -0.17);
+    const grip = box(0.038, 0.11, 0.05, 0x1f2125, 0, -0.045, -0.02); grip.rotation.x = -0.08;
+    this.mag = box(0.03, 0.13, 0.04, 0x15171a, 0, -0.075, -0.02); this.mag.rotation.x = -0.08;
+    this.bolt = box(0.014, 0.014, 0.03, 0xb8bcc4, 0.03, 0.05, -0.02, { m: 0.8, r: 0.3 });
+    const stock = box(0.012, 0.012, 0.16, 0x2a2c31, 0.03, 0.0, 0.1, { m: 0.5 });
+    g.add(this.body, top, barrel, sight, grip, this.mag, this.bolt, stock);
+    this.muzzle.position.set(0, 0.035, -0.29); g.add(this.muzzle);
+    const rh = arm(1); rh.position.set(0, -0.06, 0.04); rh.rotation.x = 0.25; g.add(rh);
+    this.left = arm(-1); this.left.position.set(-0.03, -0.035, -0.12); this.left.rotation.set(0.15, 0.35, 0.25);
+    g.add(this.left);
+    this.model.add(g);
+    this.base.set(0.19, -0.15, -0.36);
+    this.cap = 30; this.rounds = 30; this.cool = 0; this.heat = 0; this.burst = 0;
+  }
+  ammo() { return [this.rounds, this.cap]; }
+  prep() {
+    this.status = 'Encaixando o pente e puxando o ferrolho…';
+    this.play('rack', 1.0, () => { this.ready = true; this.status = this.hint; }, [
+      [0.25, () => this.game.audio.play('click', { vol: 0.45, rate: 0.75 })],
+      [0.55, () => this.game.audio.play('lever', { vol: 0.45, rate: 1.5 })],
+      [0.75, () => this.game.audio.play('click', { vol: 0.4, rate: 1.2 })],
+    ]);
+  }
+  down() { super.down(); this.burst = 0; this.tryFire(); }
+  up() { super.up(); if (this.burst > 0) this.game.audio.play('click', { vol: 0.18, rate: 1.6 }); this.burst = 0; }
+  tryFire() {
+    const g = this.game;
+    if (!this.isDown || !this.ready || this.anim || this.cool > 0 || this.rounds <= 0) return;
+    if (g.duel && g.mode === 'duel' && this.burst > 0 && !g.duel.canFire()) { this.isDown = false; return; }
+    this.cool += 0.085;               // ~12 tiros por segundo
+    this.rounds--; this.burst++;
+    // spread "blooms" while the trigger is held
+    this.heat = Math.min(1, this.heat + 0.09);
+    const o = g.aimFrame.getWorldPosition(new THREE.Vector3());
+    const dir = this.aimDir(0.006 + this.heat * 0.03);
+    g.hitscan(o, dir, { dmg: 17, force: 2.2, tracer: this.burst % 2 === 1, from: this.muzzleWorld(), kind: 'smg', quiet: this.burst % 3 !== 1 });
+    g.onFired(this);
+    g.audio.play('gunsharp', { vol: 0.55, rate: 1.35, rateJitter: 0.07, reverb: 0.3 });
+    g.audio.play('pistol', { vol: 0.4, rate: 1.25, rateJitter: 0.06 });
+    const mp = this.muzzleWorld();
+    g.fx.flashSprite(mp, 2.4 + Math.random(), [1, 0.85, 0.5], 0.04);
+    g.fx.light(mp, 5, 0.05, 0xffc070);
+    g.vmFlash(1.6);
+    if (this.burst % 3 === 0) g.fx.smoke(mp, { dark: 0.6, s0: 0.08, s1: 0.6, life: R(0.5, 0.9), vy: R(0.2, 0.5), a: 0.22, spread: 0.15 });
+    this.ejectCasing(0xc9a24a, new THREE.Vector3(0.6, 0.6, 1.4), 0.024);
+    this.kick.z = 0.035; this.kick.rx = 0.06 + Math.random() * 0.03; this.kick.ry = R(-0.03, 0.03);
+    this.boltBack = 1;
+    g.recoil(0.0045 + this.heat * 0.004, R(-0.004, 0.004));
+    g.shake(0.035);
+    if (this.burst % 2 === 1) g.haptic(0.12);
+    if (this.rounds <= 0) this.reload();
+  }
+  reload() {
+    this.ready = false; this.isDown = false; this.status = 'Trocando o pente…';
+    this.game.audio.play('click', { vol: 0.25, rate: 1.4 });
+    this.play('reload', 1.6, () => { this.rounds = this.cap; this.ready = true; this.status = this.hint; }, [
+      [0.2, () => this.game.audio.play('click', { vol: 0.45, rate: 0.7 })],
+      [0.4, () => this.game.audio.play('metaldrop', { vol: 0.25, rate: 1.6 })],
+      [0.95, () => this.game.audio.play('click', { vol: 0.5, rate: 1.05 })],
+      [1.3, () => this.game.audio.play('lever', { vol: 0.45, rate: 1.6 })],
+    ]);
+  }
+  pose(dt) {
+    this.cool = Math.max(this.isDown ? -0.05 : 0, this.cool - dt);
+    if (!this.isDown) this.heat = Math.max(0, this.heat - dt * 2.2);
+    // automatic fire: keep shooting while held (several shots per frame at low fps)
+    let guard = 3;
+    while (this.isDown && this.cool <= 0 && guard-- > 0 && this.ready && !this.anim) this.tryFire();
+    this.boltBack = Math.max(0, (this.boltBack || 0) - dt * 22);
+    const a = this.anim;
+    this.gun.rotation.set(0, 0, 0);
+    this.mag.position.y = -0.075; this.mag.visible = true;
+    let bb = this.boltBack * 0.025;
+    if (a && a.name === 'rack') { const t = a.t / a.dur; this.gun.rotation.z = pulse(t, 0.05, 0.95) * 0.45; this.mag.position.y = -0.075 - (1 - easeOut(t / 0.4)) * 0.12; bb = pulse(t, 0.45, 0.75) * 0.045; }
+    if (a && a.name === 'reload') {
+      const t = a.t / a.dur;
+      this.gun.rotation.z = pulse(t, 0, 1) * 0.55; this.gun.rotation.x = pulse(t, 0, 1) * 0.25;
+      this.mag.position.y = -0.075 - pulse(t, 0.12, 0.8) * 0.3;
+      this.mag.visible = !(t > 0.35 && t < 0.5);
+      bb = pulse(t, 0.78, 0.92) * 0.045;
+      this.left.position.y = -0.035 - pulse(t, 0.2, 0.75) * 0.18;
+    } else this.left.position.y = -0.035;
+    this.bolt.position.z = -0.02 + bb;
+    if (this.ready) this.status = `${this.rounds}/${this.cap}`;
+  }
+  unequip() { super.unequip(); this.heat = 0; this.burst = 0; }
 }
 
 // ---------------- 4. Shotgun 12 ----------------
@@ -776,5 +872,5 @@ class RocketLauncher extends Weapon {
 export function setSleeveColor(hex) { M(SLEEVE).color.setHex(hex); }
 
 export function makeWeapons(game) {
-  return [Rock, Slingshot, Pistol, Shotgun, Rifle50, Grenade, Cannon, RocketLauncher].map(C => new C(game));
+  return [Rock, Slingshot, Pistol, SMG, Shotgun, Rifle50, Grenade, Cannon, RocketLauncher].map(C => new C(game));
 }

@@ -685,9 +685,9 @@ class Game {
       if (!best) return null;
       if (best === 'boss') {
         const p = origin.clone().addScaledVector(dir, bt);
-        const dmg = (opts.kind === 'pellet' ? 3 : 6) * (boh.head ? 1.6 : 1);
+        const dmg = (opts.kind === 'pellet' ? 3 : opts.kind === 'smg' ? 2.5 : 6) * (boh.head ? 1.6 : 1);
         this.duel.damage(boh.b, dmg, 'tiro', p);
-        boh.b.vel.addScaledVector(dir, opts.kind === 'pellet' ? 0.6 : 1.2);
+        boh.b.vel.addScaledVector(dir, opts.kind === 'pellet' || opts.kind === 'smg' ? 0.5 : 1.2);
         this.fx.chipsBurst(p, 4, 0xffe14a, 3, 0.04, dir.clone().negate());
         return { point: p };
       }
@@ -1073,9 +1073,9 @@ class Game {
       this.input.keys[e.code] = true;
       if (!this.started) return;
       if ((e.code === 'KeyF' || e.code === 'Enter' || e.code === 'KeyX') && !e.repeat) this.fireDown();
-      if (e.code.startsWith('Digit')) { const n = +e.code.slice(5) - 1; if (n >= 0 && n < 8) this.selectWeapon(n); }
-      if (e.code === 'KeyQ') this.selectWeapon((this.wi + 7) % 8);
-      if (e.code === 'KeyE') this.selectWeapon((this.wi + 1) % 8);
+      if (e.code.startsWith('Digit')) { const n = +e.code.slice(5) - 1; if (n >= 0 && n < this.weapons.length) this.selectWeapon(n); }
+      if (e.code === 'KeyQ') this.selectWeapon((this.wi + this.weapons.length - 1) % this.weapons.length);
+      if (e.code === 'KeyE') this.selectWeapon((this.wi + 1) % this.weapons.length);
       if (e.code === 'KeyT') this.toggleSlow();
       if (e.code === 'KeyR' && e.shiftKey) this.resetLevel();
       if (e.code === 'KeyZ') this.toggleZoom();
@@ -1219,8 +1219,8 @@ class Game {
       grid.appendChild(b);
     });
     const on = (id, fn) => { const el = $(id); el.addEventListener('click', e => { e.stopPropagation(); this.audio.resume(); fn(); }); el.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); };
-    on('prev', () => this.selectWeapon((this.wi + 7) % 8));
-    on('next', () => this.selectWeapon((this.wi + 1) % 8));
+    on('prev', () => this.selectWeapon((this.wi + this.weapons.length - 1) % this.weapons.length));
+    on('next', () => this.selectWeapon((this.wi + 1) % this.weapons.length));
     on('arsenal', () => this.openArsenal());
     on('arsenal-close', () => this.closeArsenal());
     on('zoom', () => this.toggleZoom());

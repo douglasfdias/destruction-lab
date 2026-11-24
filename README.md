@@ -2,7 +2,7 @@
 
 Jogo mobile 3D de destruição (Android, celular na horizontal). HTML + JavaScript + Three.js, sem build.
 
-- **Laboratório**: modo livre com casa, carros, barris e 8 armas.
+- **Laboratório**: modo livre com casa, carros, barris e 9 armas (inclui submetralhadora automática).
 - **Duelo**: dois fortes, turnos, vento, contra o computador ou 2 jogadores.
 
 ## Rodar

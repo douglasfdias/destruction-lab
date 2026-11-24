@@ -129,7 +129,8 @@ export class Physics {
     for (const p of b.pieces) {
       if (p.inst < 0) continue;
       tmpV.copy(p.lp).applyQuaternion(b.quat).add(b.pos);
-      tmpM.compose(tmpV, b.quat, p.s);
+      if (b.fadeK != null) { tmpS.copy(p.s).multiplyScalar(b.fadeK); tmpV.y -= (1 - b.fadeK) * VOX * 0.3; tmpM.compose(tmpV, b.quat, tmpS); }
+      else tmpM.compose(tmpV, b.quat, p.s);
       this.meshes[p.m].setMatrixAt(p.inst, tmpM);
       this.meshes[p.m].instanceMatrix.needsUpdate = true;
     }
@@ -257,7 +258,56 @@ export class Physics {
     return b;
   }
 
+  // small pieces don't become permanent rubble: they settle, then shrink away (keeps the scene light)
+  _fadeable(b) { return b.kind !== 'prop' && (b.kind !== 'chunk' || b.pieces.length <= 3); }
+  // is anything (terrain, rubble, a wall/floor voxel) right under the body's lowest points?
+  _supported(b, ignoreRubble = false) {
+    let lowY = 1e9;
+    const pts = [];
+    for (const s of b.samples) { const p = tmpV.copy(s).applyQuaternion(b.quat).add(b.pos); pts.push(p.x, p.y, p.z); if (p.y < lowY) lowY = p.y; }
+    for (let i = 0; i < pts.length; i += 3) {
+      const x = pts[i], y = pts[i + 1], z = pts[i + 2];
+      if (y > lowY + 0.3) continue;
+      const fl = ignoreRubble ? this.terrain.heightAt(x, z) : this.floorAt(x, z);
+      if (y - 0.2 < fl) return true;
+      const c = worldToCell(x, y - 0.2, z);
+      if (c >= 0 && this.world.mat[c]) return true;
+    }
+    return false;
+  }
+  // a frozen chunk is held up only by terrain, voxels or another frozen body touching it from below
+  _frozenSupported(b) {
+    if (this._supported(b, true)) return true;
+    let lowY = 1e9;
+    for (const s of b.samples) { const y = tmpV.copy(s).applyQuaternion(b.quat).add(b.pos).y; if (y < lowY) lowY = y; }
+    for (const o of this.frozen) {
+      if (o === b || o.dead) continue;
+      const dx = o.pos.x - b.pos.x, dz = o.pos.z - b.pos.z, rr = o.radius + b.radius;
+      if (o.pos.y < b.pos.y && dx * dx + dz * dz < rr * rr && o.pos.y + o.radius > lowY - 0.3) return true;
+    }
+    return false;
+  }
+  // after supports vanish, drop frozen chunks that are left hanging in the air
+  _dropUnsupported() {
+    let any = false;
+    for (let pass = 0; pass < 3; pass++) {
+      let changed = false;
+      for (let i = this.frozen.length - 1; i >= 0; i--) {
+        const b = this.frozen[i];
+        if (!this._frozenSupported(b)) { this.unfreeze(b); b.age = 0; b.vel.y = -0.5; changed = any = true; }
+      }
+      if (!changed) break;
+    }
+    if (any) this.rebuildRubble();
+    return any;
+  }
+
   _freezeOldest() {
+    // first choice: drop the oldest small piece (it would fade soon anyway) instead of freezing something mid-air
+    // (settled pieces go first, so pieces still flying from a fresh blast keep the show going)
+    let small = null, sa = -1;
+    for (const b of this.bodies) if (this._fadeable(b)) { const sc = b.age + (b.sleeping ? 100 : 0); if (sc > sa) { sa = sc; small = b; } }
+    if (small && sa > 1.5) { this.removeBody(small); return true; }
     let best = null, bs = -1;
     for (const b of this.bodies) {
       if (b.kind === 'prop') continue;
@@ -265,7 +315,7 @@ export class Physics {
       if (score > bs) { bs = score; best = b; }
     }
     if (!best) return false;
-    this._freeze(best);
+    if (best.sleeping && this._supported(best)) this._freeze(best); else this.removeBody(best);
     return true;
   }
   _freeze(b) {
@@ -275,7 +325,10 @@ export class Physics {
     this.frozen.push(b);
     this._stampRubble(b);
     // cap frozen total to keep memory/instances bounded
-    while (this.frozen.length > this.q.maxFrozen) this.removeBody(this.frozen[0]);
+    if (this.frozen.length > this.q.maxFrozen) {
+      while (this.frozen.length > this.q.maxFrozen) this.removeBody(this.frozen[0]);
+      this.rebuildRubble(); this._needSupportCheck = true;
+    }
   }
   unfreeze(b) {
     const i = this.frozen.indexOf(b);
@@ -319,7 +372,7 @@ export class Physics {
         if (b.kind === 'prop') hits.push({ b, f });
       }
     }
-    if (unfroze) this.rebuildRubble();
+    if (unfroze) { this.rebuildRubble(); this._needSupportCheck = true; }
     return hits;
   }
 
@@ -339,8 +392,9 @@ export class Physics {
     for (const b of this.bodies) if (b.sleeping && near(b)) { b.sleeping = false; b.sleepT = 0; b.contactT = 0; b.age = Math.min(b.age, 5); }
     for (const b of this.props) if (b.sleeping && !b.dead && near(b)) { b.sleeping = false; b.sleepT = 0; b.contactT = 0; }
     let any = false;
-    for (let i = this.frozen.length - 1; i >= 0; i--) { const b = this.frozen[i]; if (b.kind === 'chunk' && near(b)) { this.unfreeze(b); b.age = 0; any = true; } }
+    for (let i = this.frozen.length - 1; i >= 0; i--) { const b = this.frozen[i]; if (near(b)) { this.unfreeze(b); b.age = 0; any = true; } }
     if (any) this.rebuildRubble();
+    this._needSupportCheck = true;
     q.length = 0;
   }
 
@@ -350,9 +404,9 @@ export class Physics {
     let any = false;
     for (let i = this.frozen.length - 1; i >= 0; i--) {
       const b = this.frozen[i];
-      if (b.pos.distanceToSquared(p) < (r + b.radius) ** 2 && b.kind === 'chunk') { this.unfreeze(b); any = true; }
+      if (b.pos.distanceToSquared(p) < (r + b.radius) ** 2) { this.unfreeze(b); any = true; }
     }
-    if (any) this.rebuildRubble();
+    if (any) { this.rebuildRubble(); this._needSupportCheck = true; }
   }
 
   // ---------- simulation ----------
@@ -453,7 +507,11 @@ export class Physics {
       if (settle) { b.sleepT += dt; if (b.sleepT > 0.3) { b.sleeping = true; b.vel.set(0, 0, 0); b.ang.set(0, 0, 0); } }
       else b.sleepT = 0;
       // nothing stays simulated forever (unless clearly falling)
-      if (b.kind !== 'prop' && b.age > 14 && b.vel.y > -3) { b.sleeping = true; b.sleepT = 99; b.vel.set(0, 0, 0); b.ang.set(0, 0, 0); }
+      // (only when something is underneath: a piece must never be parked in mid-air)
+      if (b.kind !== 'prop' && b.age > 14 && b.vel.y > -3 && !b.sleeping) {
+        if (this._supported(b)) { b.sleeping = true; b.sleepT = 99; b.vel.set(0, 0, 0); b.ang.set(0, 0, 0); }
+        else if (this._fadeable(b)) b.fadeT = Math.max(b.fadeT || 0, 0.01);   // wedged on other pieces: just let it vanish
+      }
       if (b.pos.y < -30) b.dead = true;
     }
     this._debrisContacts(dt);
@@ -461,12 +519,24 @@ export class Physics {
     // write matrices
     for (const b of this.bodies) if (!b.sleeping || b.sleepT === 0) this._writeMatrices(b);
     for (const b of this.props) if (b.mesh) { b.mesh.position.copy(b.pos); b.mesh.quaternion.copy(b.quat); }
-    // freeze long-sleeping debris
+    // small debris: shrink away a few seconds after settling; big chunks become rubble
+    const FADE_AFTER = 5, FADE_LEN = 0.9;
     for (let i = this.bodies.length - 1; i >= 0; i--) {
       const b = this.bodies[i];
       if (b.dead) { this.removeBody(b); continue; }
-      if (b.sleeping) { b.sleepT += dt; if (b.sleepT > 1.2) this._freeze(b); }
+      if (this._fadeable(b)) {
+        if (b.sleeping) b.sleepT += dt;
+        if (b.fadeT || (b.sleeping && b.sleepT > FADE_AFTER) || b.age > 16) {
+          b.fadeT = (b.fadeT || 0) + dt;
+          b.fadeK = Math.max(0, 1 - b.fadeT / FADE_LEN);
+          if (b.fadeK <= 0) { this.removeBody(b); continue; }
+          this._writeMatrices(b);
+        }
+        continue;
+      }
+      if (b.sleeping) { b.sleepT += dt; if (b.sleepT > 1.2) { if (this._supported(b)) this._freeze(b); else { b.sleeping = false; b.sleepT = 0; } } }
     }
+    if (this._needSupportCheck) { this._needSupportCheck = false; this._dropUnsupported(); }
     for (const b of this.props) if (b.sleeping && !b.dead) b.sleepT += dt;
     this.events.push(...contacts.map(c => ({ type: 'impact', ...c })));
     for (const b of breaks) this.shatter(b);
