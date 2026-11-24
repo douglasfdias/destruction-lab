@@ -1187,7 +1187,7 @@ class Game {
       if (this.duel.boss.stock[id] <= 0) { this.toast('SEM ESTOQUE DESSA ARMA'); return; }
     }
     if (this.duel) this.duel.boss.wi = i;
-    if (i === this.wi && this.weapons[i].model.visible) return;
+    if (i === this.wi && this.weapons[i].equipped) return;
     if (this.wi >= 0 && this.weapons[this.wi]) this.weapons[this.wi].unequip();
     this.wi = i;
     if (this.zoomed && this.weapons[i].id !== 'rifle50') this.toggleZoom(false);
@@ -1410,7 +1410,7 @@ class Game {
       if (this.duel) this.duel.update(rdt, dt);
       else {
         this.updatePlayer(rdt);
-        for (const w of this.weapons) if (w.model.visible) w.update(dt);
+        for (const w of this.weapons) if (w.equipped) w.update(dt);
       }
       this.updateProjectiles(dt);
       for (let i = this.timers.length - 1; i >= 0; i--) { const t = this.timers[i]; t.t -= dt; if (t.t <= 0) { this.timers.splice(i, 1); t.fn(); } }

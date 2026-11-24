@@ -418,6 +418,14 @@ export class Duel {
     }
   }
 
+  // safety net: a weapon that is not ready and has nothing running to make it ready again gets prepared again
+  watchdog(rdt) {
+    const g = this.game, w = g.weapons[g.wi];
+    if (this.state !== 'aim' || !w || !w.equipped || w.ready || w.anim) { this.stuckT = 0; return; }
+    this.stuckT = (this.stuckT || 0) + rdt;
+    if (this.stuckT > 1.5) { this.stuckT = 0; w.isDown = false; w.prep(); }
+  }
+
   passTurn() {
     if (this.state !== 'aim') return;
     if (this.game.weapons[this.game.wi].isDown) this.game.weapons[this.game.wi].up();
@@ -440,7 +448,8 @@ export class Duel {
     g.player = b;
     if (!this.isAI()) { g.input.lookDX = 0; g.input.lookDY = 0; }
     // weapons of the active boss
-    for (const w of b.weapons) if (w.model.visible) w.update(dt);
+    for (const w of b.weapons) if (w.equipped) w.update(dt);
+    this.watchdog(rdt);
     // state machine
     switch (this.state) {
       case 'intro':
@@ -568,7 +577,7 @@ export class Duel {
     // hide the boss + gun when looking through the scope
     const scoped = st === 'aim' && g.zoomed;
     b.model.visible = !scoped && cam.position.distanceTo(b.headPos()) > 1.3;
-    for (const w of b.weapons) if (w.model.visible && scoped) w.model.visible = !scoped || !!w.anim;
+    for (const w of b.weapons) if (w.equipped) w.model.visible = !scoped || !!w.anim;
     $('cross').style.display = st === 'aim' && !this.isAI() ? 'block' : 'none';
   }
 

@@ -50,11 +50,11 @@ class Weapon {
   busy() { return !!this.anim; }
   equip() {
     this.equipT = 0; this.ready = false; this.isDown = false; this.charge = 0;
-    this.model.visible = true;
+    this.model.visible = true; this.equipped = true;
     this.prep();
   }
   prep() { this.play('raise', 0.4, () => { this.ready = true; }); }
-  unequip() { this.model.visible = false; this.anim = null; this.isDown = false; this.stopLoops && this.stopLoops(); }
+  unequip() { this.model.visible = false; this.equipped = false; this.anim = null; this.isDown = false; this.stopLoops && this.stopLoops(); }
   down() { this.isDown = true; }
   up() { this.isDown = false; }
   update(dt) {
@@ -283,6 +283,7 @@ class Pistol extends Weapon {
   }
   ammo() { return [this.rounds, 12]; }
   prep() {
+    if (this.rounds <= 0) this.rounds = 12;
     this.status = 'Puxando o ferrolho…';
     this.play('rack', 0.8, () => { this.ready = true; this.status = this.hint; }, [
       [0.35, () => this.game.audio.play('lever', { vol: 0.4, rate: 1.6 })],
@@ -360,6 +361,7 @@ class SMG extends Weapon {
   }
   ammo() { return [this.rounds, this.cap]; }
   prep() {
+    if (this.rounds <= 0) this.rounds = this.cap;
     this.status = 'Encaixando o pente e puxando o ferrolho…';
     this.play('rack', 1.0, () => { this.ready = true; this.status = this.hint; }, [
       [0.25, () => this.game.audio.play('click', { vol: 0.45, rate: 0.75 })],
