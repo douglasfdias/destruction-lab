@@ -75,6 +75,8 @@ export class Audio {
   // name: sample set; opts: {pos, vol, rate, rateJitter, reverb, delay, lowpass, idx}
   play(name, opts = {}) {
     if (!this.ready || this.muted) return null;
+    // sounds made by another boss's weapon come from where that boss stands
+    if (!opts.pos && this.ctxPos) opts = { ...opts, pos: this.ctxPos };
     const set = this.buffers[name];
     if (!set || !set.length) return null;
     const c = this.ctx;
@@ -128,6 +130,7 @@ export class Audio {
   // synthetic sub-bass thump that makes the phone speaker "push" (layer under sampled booms)
   thump(power = 1, opts = {}) {
     if (!this.ready || this.muted) return;
+    if (!opts.pos && this.ctxPos) opts = { ...opts, pos: this.ctxPos };
     const c = this.ctx;
     let delay = opts.delay || 0, vol = Math.min(1, 0.45 * power);
     if (opts.pos) {

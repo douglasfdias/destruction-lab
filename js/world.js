@@ -88,7 +88,7 @@ export class World {
     this.crumbling = new Set();
     this.listeners = { removed: null, chunk: null, crumble: null };
     this.totalHouse = 0; this.removedHouse = 0;
-    this.teamTotal = [0, 0]; this.teamRemoved = [0, 0];
+    this.teamTotal = [0, 0, 0]; this.teamRemoved = [0, 0, 0];
     this._v = new THREE.Vector3();
     this._m = new THREE.Matrix4();
     this._c = new THREE.Color();
@@ -217,7 +217,7 @@ export class World {
 
   // ---------- duel: two mirrored forts ----------
   buildFort(f, team) {
-    const fl = 1 | (team === 0 ? 2 : 4);
+    const fl = 1 | (2 << team); // team bits: 2, 4, 8
     const i0 = this.ci(f.x0), i1 = this.ci(f.x1) - 1, k0 = this.ck(f.z0), k1 = this.ck(f.z1) - 1;
     const W = i1 - i0 + 1, D = k1 - k0 + 1;
     const kf = f.face < 0 ? k0 : k1, kb = f.face < 0 ? k1 : k0; // front faces the enemy
@@ -261,22 +261,36 @@ export class World {
   }
 
   buildDuel(layout) {
-    for (let t = 0; t < 2; t++) this.buildFort(layout.forts[t], t);
-    // mid-field cover: low concrete barricade with a gap, stacked crates, a little wooden shed
-    for (let i = this.ci(-4); i <= this.ci(4); i++) { if (Math.abs(OX + (i + 0.5) * VOX) < 0.7) continue; for (let j = 0; j <= 2; j++) this.set(i, j, this.ck(-2), MAT.CONCRETE, 0xb0aea8, false); }
+    for (let t = 0; t < layout.forts.length; t++) this.buildFort(layout.forts[t], t);
     const crate = (x, z, h) => { const a = this.ci(x), b = this.ck(z); for (let j = 0; j < h; j++) this.box(a, j, b, a + 1, j, b + 1, MAT.WOOD, 0xb88a52, false); };
-    crate(-5.5, 4.5, 2); crate(-4.5, 4.5, 1); crate(5, -8, 2); crate(6, -8.2, 1); crate(4.6, 5.4, 1);
-    const s0 = this.ci(9), s1 = this.ci(12), k0 = this.ck(-6), k1 = this.ck(-4);
-    for (let j = 0; j <= 4; j++) for (let i = s0; i <= s1; i++) for (let k = k0; k <= k1; k++) {
-      const edge = i === s0 || i === s1 || k === k0 || k === k1;
-      if (edge && !(j <= 3 && k === k1 && i === s0 + 2)) this.set(i, j, k, MAT.WOOD, 0x9c7a50, false);
+    const shed = (x0, x1, z0, z1, doorK1) => {
+      const s0 = this.ci(x0), s1 = this.ci(x1), k0 = this.ck(z0), k1 = this.ck(z1);
+      for (let j = 0; j <= 4; j++) for (let i = s0; i <= s1; i++) for (let k = k0; k <= k1; k++) {
+        const edge = i === s0 || i === s1 || k === k0 || k === k1;
+        if (edge && !(j <= 3 && k === (doorK1 ? k1 : k0) && i === s0 + 2)) this.set(i, j, k, MAT.WOOD, 0x9c7a50, false);
+      }
+      this.box(s0, 5, k0, s1, 5, k1, MAT.METAL, 0x7d8fa1, false);
+    };
+    // low concrete barricade along x (with a gap in the middle) / along z
+    const wallX = (xa, xb, z, gap = 0.7) => { for (let i = this.ci(xa); i <= this.ci(xb); i++) { const x = OX + (i + 0.5) * VOX; if (Math.abs(x - (xa + xb) / 2) < gap) continue; for (let j = 0; j <= 2; j++) this.set(i, j, this.ck(z), MAT.CONCRETE, 0xb0aea8, false); } };
+    const wallZ = (x, za, zb, gap = 0.7) => { for (let k = this.ck(za); k <= this.ck(zb); k++) { const z = OZ + (k + 0.5) * VOX; if (Math.abs(z - (za + zb) / 2) < gap) continue; for (let j = 0; j <= 2; j++) this.set(this.ci(x), j, k, MAT.CONCRETE, 0xb0aea8, false); } };
+    if (layout.forts.length === 3) {
+      // triangle yard: a barricade in front of each fort's line of fire, crates and a shed in the middle
+      wallX(-4, 4, 1.5);
+      wallZ(-0.2, -19, -13, 1.0);
+      wallX(-12, -6, -8.5); wallX(6, 12, -8.5);
+      crate(-3.5, -5, 2); crate(-2.5, -5, 1); crate(3.2, -4.5, 2); crate(4.2, -4.7, 1); crate(-13, -4, 1); crate(13, -4, 2);
+      shed(-1.5, 1.5, -12, -10, true);
+    } else {
+      // mid-field cover: low concrete barricade with a gap, stacked crates, a little wooden shed
+      wallX(-4, 4, -2);
+      crate(-5.5, 4.5, 2); crate(-4.5, 4.5, 1); crate(5, -8, 2); crate(6, -8.2, 1); crate(4.6, 5.4, 1);
+      shed(9, 12, -6, -4, true);
     }
-    this.box(s0, 5, k0, s1, 5, k1, MAT.METAL, 0x7d8fa1, false);
-    this.totalHouse = 0; this.removedHouse = 0; this.teamTotal = [0, 0]; this.teamRemoved = [0, 0];
+    this.totalHouse = 0; this.removedHouse = 0; this.teamTotal = [0, 0, 0]; this.teamRemoved = [0, 0, 0];
     for (let c = 0; c < N; c++) if (this.mat[c]) {
       if (this.flags[c] & 1) this.totalHouse++;
-      if (this.flags[c] & 2) this.teamTotal[0]++;
-      if (this.flags[c] & 4) this.teamTotal[1]++;
+      for (let t = 0; t < 3; t++) if (this.flags[c] & (2 << t)) this.teamTotal[t]++;
     }
   }
 
@@ -408,14 +422,15 @@ export class World {
     if (!m) return;
     this._removeInstance(c);
     if (this.flags[c] & 1) this.removedHouse++;
-    if (this.flags[c] & 2) this.teamRemoved[0]++;
-    if (this.flags[c] & 4) this.teamRemoved[1]++;
+    if (this.flags[c] & 14) this._teamRemove(this.flags[c]);
     this.mat[c] = 0;
     this.crumbling.delete(c);
     this.flags[c] = 0;
     this.dirty = true;
     if (this.listeners.removed) this.listeners.removed(c, m, info);
   }
+
+  _teamRemove(f) { for (let t = 0; t < 3; t++) if (f & (2 << t)) this.teamRemoved[t]++; }
 
   // detach cells to a physics chunk (no debris spawn, no value counted twice)
   takeCells(cells) {
@@ -426,8 +441,7 @@ export class World {
       out.push({ c, m, tint: this.tint[c], dmg: 1 - this.hp[c] / MATS[m].hp });
       this._removeInstance(c);
       if (this.flags[c] & 1) this.removedHouse++;
-      if (this.flags[c] & 2) this.teamRemoved[0]++;
-      if (this.flags[c] & 4) this.teamRemoved[1]++;
+      if (this.flags[c] & 14) this._teamRemove(this.flags[c]);
       this.mat[c] = 0; this.flags[c] = 0; this.crumbling.delete(c);
     }
     this.dirty = true;

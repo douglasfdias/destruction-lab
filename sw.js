@@ -1,5 +1,5 @@
 // Offline cache for the installed web app (used when hosted on its own site, e.g. GitHub Pages).
-const CACHE = 'dlab-v4';
+const CACHE = 'dlab-v5';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './lib/three.module.min.js',
   './js/main.js', './js/world.js', './js/physics.js', './js/terrain.js', './js/fx.js', './js/audio.js', './js/textures.js', './js/weapons.js', './js/sfx.js', './js/duel.js'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));

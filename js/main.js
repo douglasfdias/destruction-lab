@@ -7,7 +7,7 @@ import { FX } from './fx.js';
 import { Audio, Haptics } from './audio.js';
 import { makeMaterialTextures, makeCrackTexture, makeGroundTexture, makeParticleAtlas, makeDecalTextures, makeDuelGroundTexture } from './textures.js';
 import { makeWeapons, setSleeveColor } from './weapons.js';
-import { Duel, DUEL_LAYOUT } from './duel.js';
+import { Duel, DUEL_LAYOUT, DUEL3_LAYOUT } from './duel.js';
 
 const R = (a, b) => a + Math.random() * (b - a);
 const $ = id => document.getElementById(id);
@@ -197,6 +197,7 @@ class Game {
       m4.compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, R(0, 6), 0)), new THREE.Vector3(sc, sc, sc));
       tI.setMatrixAt(i, m4); cI.setMatrixAt(i, m4);
     });
+    this.trees = { tI, cI, pos: treePos, mats: treePos.map((_, i) => { const m = new THREE.Matrix4(); tI.getMatrixAt(i, m); return m; }) };
     tI.castShadow = cI.castShadow = true; tI.receiveShadow = cI.receiveShadow = true;
     s.add(tI, cI);
     // street lamps & cones belong to the lab street only
@@ -245,10 +246,17 @@ class Game {
     this.terrain.reset();
     const duel = this.layout.mode === 'duel';
     if (duel) {
-      this.terrain.addHills([{ x: -10.5, z: -3, h: 1.6, rx: 4.5, rz: 3.5 }, { x: 11.5, z: 2.5, h: 1.3, rx: 4, rz: 3 }, { x: 1.5, z: 4.5, h: 0.6, rx: 2.2, rz: 1.5 }]);
+      this.terrain.addHills(this.layout.hills);
       this.terrain.setTexture(this.duelGround || (this.duelGround = makeDuelGroundTexture(64)));
     } else this.terrain.setTexture(this.labGround);
     this.labDecor.visible = !duel;
+    // trees standing where a fort goes are hidden for that layout
+    { const T = this.trees, zero = new THREE.Matrix4().makeScale(0, 0, 0);
+      T.pos.forEach(([x, z], i) => {
+        const hide = duel && this.layout.forts.some(f => x > f.x0 - 2.5 && x < f.x1 + 2.5 && z > f.z0 - 2.5 && z < f.z1 + 2.5);
+        T.tI.setMatrixAt(i, hide ? zero : T.mats[i]); T.cI.setMatrixAt(i, hide ? zero : T.mats[i]);
+      });
+      T.tI.instanceMatrix.needsUpdate = true; T.cI.instanceMatrix.needsUpdate = true; }
     this.world.buildLevel(this.layout);
     this.world.buildMeshes(this.q);
     this.world.dirty = false;
@@ -256,11 +264,8 @@ class Game {
     this.wind.set(0, 0, 0);
     this.timers.length = 0;
     if (duel) {
-      this.addCar(-14, -1, Math.PI / 2, 0xd8392b);
-      this.addCar(14.5, -3, -Math.PI / 2, 0x2f9e6a);
-      this.addBarrel(6.6, 9.6); this.addBarrel(7.3, 10.2);
-      this.addBarrel(-6.6, -12.6); this.addBarrel(-7.3, -13.2);
-      this.addBarrel(-1.2, -2.8);
+      for (const c of this.layout.cars) this.addCar(...c);
+      for (const b of this.layout.barrels) this.addBarrel(...b);
     } else {
       this.addCar(-2.5, 7.0, 0, 0xd8392b);
       this.addCar(8.5, 9.0, Math.PI, 0x2f6fd1);
@@ -493,11 +498,11 @@ class Game {
   }
 
   // ---------------- feedback helpers ----------------
-  shake(a) { this.trauma = Math.min(1, this.trauma + a); }
-  recoil(pitch, yaw) { this.player.pitch += pitch; this.player.yaw += yaw; this.recoilP += pitch; }
-  fovPunch(d) { this.fovKick += d; }
-  haptic(s) { Haptics.impact(s); }
-  vmFlash(i) { this.vmLight.intensity = i * 1.5; }
+  shake(a) { if (this.ctxAI) return; this.trauma = Math.min(1, this.trauma + a); }
+  recoil(pitch, yaw) { this.player.pitch += pitch; this.player.yaw += yaw; if (!this.ctxAI) this.recoilP += pitch; }
+  fovPunch(d) { if (this.ctxAI) return; this.fovKick += d; }
+  haptic(s) { if (this.ctxAI) return; Haptics.impact(s); }
+  vmFlash(i) { if (this.ctxAI) return; this.vmLight.intensity = i * 1.5; }
   slowmo(scale, dur) { if (this.manualSlow) return; this.targetScale = scale; this.slowmoT = dur; }
 
   onFired(w, info) { if (this.duel) this.duel.onFired(w, info); }
@@ -1182,7 +1187,7 @@ class Game {
   selectWeapon(i, force = false) {
     if (this.duel && !force) {
       if (this.duel.isAI()) return;
-      if (!this.duel.canSwitch()) { this.toast('ARMA TRAVADA ATÉ O FIM DO TURNO'); return; }
+      if (!this.duel.canSwitch()) { this.toast(this.duel.switchBlockedMsg()); return; }
       const id = this.weapons[i].id;
       if (this.duel.boss.stock[id] <= 0) { this.toast('SEM ESTOQUE DESSA ARMA'); return; }
     }
@@ -1190,6 +1195,7 @@ class Game {
     if (i === this.wi && this.weapons[i].equipped) return;
     if (this.wi >= 0 && this.weapons[this.wi]) this.weapons[this.wi].unequip();
     this.wi = i;
+    if (this.ctxAI) { this.weapons[i].equip(); return; }
     if (this.zoomed && this.weapons[i].id !== 'rifle50') this.toggleZoom(false);
     this.weapons[i].equip();
     this.audio.play('ui', { vol: 0.3 });
@@ -1243,10 +1249,13 @@ class Game {
     const sens = $('sens'); sens.value = this.loadPref('sens', '1');
     sens.addEventListener('input', () => this.savePref('sens', sens.value));
     $('m-lab').addEventListener('click', () => this.start('lab'));
-    $('m-duel').addEventListener('click', () => { $('modes').style.display = 'none'; $('duelopts').style.display = 'flex'; });
-    $('duel-back').addEventListener('click', () => { $('modes').style.display = 'flex'; $('duelopts').style.display = 'none'; });
+    $('m-duel').addEventListener('click', () => { $('modes').style.display = 'none'; $('duelopts').style.display = 'flex'; $('duelopts').parentElement.classList.add('duelmode'); });
+    $('duel-back').addEventListener('click', () => { $('modes').style.display = 'flex'; $('duelopts').style.display = 'none'; $('duelopts').parentElement.classList.remove('duelmode'); });
     document.querySelectorAll('#duelopts .opt[data-diff]').forEach(b => b.addEventListener('click', () => this.start('duel', { cpu: true, diff: b.dataset.diff })));
     $('two-players').addEventListener('click', () => this.start('duel', { cpu: false }));
+    document.querySelectorAll('#duelopts .opt[data-rt]').forEach(b => b.addEventListener('click', () => this.start('duel', { n: 3, realtime: true, seats: ['human', 'cpu', 'cpu'], diff: b.dataset.rt })));
+    $('three-people').addEventListener('click', () => this.start('duel', { n: 3, seats: ['human', 'human', 'human'] }));
+    $('three-cpu').addEventListener('click', () => this.start('duel', { n: 3, seats: ['human', 'cpu', 'cpu'], diff: 'medio' }));
     on('pass', () => this.duel && this.duel.passTurn());
     $('handoff-ok').addEventListener('click', () => { this.audio.resume(); this.duel && this.duel.handoffReady(); });
     $('r-again').addEventListener('click', () => { $('result').style.display = 'none'; this.setMode('duel', this.duelOpts); });
@@ -1269,7 +1278,7 @@ class Game {
   }
 
   async start(mode = 'lab', opts = {}) {
-    $('modes').style.display = 'none'; $('duelopts').style.display = 'none'; $('loading').style.display = 'block';
+    $('modes').style.display = 'none'; $('duelopts').style.display = 'none'; $('loading').style.display = 'block'; $('duelopts').parentElement.classList.remove('duelmode');
     this.goFullscreen();
     if (!this.audio.ready) { try { await this.audio.init(); } catch (e) { console.warn(e); } }
     this.audio.resume();
@@ -1289,7 +1298,8 @@ class Game {
     this.timeScale = 1; this.targetScale = 1; this.manualSlow = false; $('slow').classList.remove('on');
     if (mode === 'duel') {
       this.duelOpts = opts;
-      this.layout = DUEL_LAYOUT;
+      this.layout = opts.n === 3 ? DUEL3_LAYOUT : DUEL_LAYOUT;
+      opts.layout = this.layout;
       this.resetLevel();
       this.duel = new Duel(this, opts);
       $('logo').style.display = 'none'; $('score').style.display = 'none';
