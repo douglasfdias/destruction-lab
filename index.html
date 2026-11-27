@@ -44,13 +44,14 @@
   #joy { position: absolute; left: calc(40px + env(safe-area-inset-left)); bottom: 34px; width: 150px; height: 150px; border-radius: 75px; background: rgba(10,13,28,.4); border: 2px solid rgba(255,255,255,.3); display: flex; align-items: center; justify-content: center; transition: opacity .2s; opacity: .8; }
   #joy.active { opacity: 1; }
   #knob { width: 62px; height: 62px; border-radius: 31px; background: rgba(255,255,255,.85); }
-  #wcard { position: absolute; left: 50%; transform: translateX(-50%); bottom: 10px; width: min(360px, 40vw); height: 62px; background: rgba(10,13,28,.82); border-radius: 14px; padding: 6px; display: flex; align-items: center; gap: 6px; }
-  #wcard .btn { width: 46px; height: 50px; flex: none; background: #2b3150; border-radius: 10px; }
-  #arsenal { flex: 1; min-width: 0; height: 50px; border: none; background: transparent; color: #fff; font-family: inherit; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; padding: 0 4px; text-align: left; }
+  #wcard { position: absolute; right: calc(12px + env(safe-area-inset-right)); top: 74px; width: 214px; height: 46px; background: rgba(10,13,28,.82); border-radius: 12px; padding: 4px; display: flex; align-items: center; gap: 4px; }
+  #wcard .btn { width: 34px; height: 38px; flex: none; background: #2b3150; border-radius: 9px; }
+  #wcard .btn svg { width: 18px; height: 18px; }
+  #arsenal { flex: 1; min-width: 0; height: 38px; border: none; background: transparent; color: #fff; font-family: inherit; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; padding: 0 4px; text-align: left; }
   #wtop { display: flex; align-items: center; gap: 8px; width: 100%; }
-  #wlevel { font-size: 10px; font-weight: 700; letter-spacing: 1px; padding: 1px 6px; border-radius: 5px; color: #1a1a1a; flex: none; }
-  #wname { font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #wstatus { font-size: 11px; font-weight: 600; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  #wlevel { font-size: 8px; font-weight: 700; letter-spacing: .5px; padding: 1px 4px; border-radius: 5px; color: #1a1a1a; flex: none; }
+  #wname { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #wstatus { font-size: 10px; font-weight: 600; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   #ammo { position: absolute; right: calc(172px + env(safe-area-inset-right)); bottom: 84px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-shadow: 0 2px 4px rgba(0,0,0,.7); }
   #ammo .n { font-family: Bungee, sans-serif; font-size: 30px; line-height: 1; }
   #ammo .n small { font-size: 15px; color: var(--txt2); }
@@ -65,6 +66,8 @@
   #fire.down { transform: translateY(5px); box-shadow: 0 3px 0 #8a2410; background: #ff5a32; }
   #zoom { position: absolute; right: calc(46px + env(safe-area-inset-right)); bottom: 178px; width: 58px; height: 58px; border-radius: 29px; border: 2px solid rgba(255,255,255,.5); }
   #jump { position: absolute; right: calc(116px + env(safe-area-inset-right)); bottom: 178px; width: 52px; height: 52px; border-radius: 26px; border: 2px solid rgba(255,255,255,.35); }
+  #view { position: absolute; right: calc(180px + env(safe-area-inset-right)); bottom: 178px; width: 52px; height: 52px; border-radius: 26px; border: 2px solid rgba(255,255,255,.35); }
+  #view.on { background: var(--y); color: #1a1a1a; border-color: #fff; }
   #toasts { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .toast { padding: 6px 14px; border-radius: 10px; background: var(--y); color: #1a1a1a; font-family: Bungee, sans-serif; font-size: 17px; box-shadow: 0 5px 0 #a87a00; transform: rotate(-3deg); animation: pop .25s ease-out; transition: opacity .5s, transform .5s; white-space: nowrap; }
   .toast.out { opacity: 0; transform: rotate(-3deg) translateY(-14px); }
@@ -108,14 +111,13 @@
   .hpw { height: 8px; border-radius: 4px; background: #2b3150; overflow: hidden; }
   .hp { height: 100%; transition: width .3s; }
   .bn { display: flex; justify-content: space-between; gap: 6px; font-size: 10px; font-weight: 600; color: var(--txt2); white-space: nowrap; }
-  #wind { position: absolute; right: calc(232px + env(safe-area-inset-right)); top: 10px; height: 46px; padding: 0 12px; border-radius: 14px; background: var(--panel); display: flex; align-items: center; gap: 8px; }
+  #wind { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 66px; height: 36px; padding: 0 12px; border-radius: 14px; background: var(--panel); display: flex; align-items: center; gap: 8px; }
   #duelhud.n3 #bosses { left: auto; right: calc(118px + env(safe-area-inset-right)); transform: none; width: min(440px, calc(100vw - 390px)) !important; }
-  #duelhud.n3 #wind { right: auto; left: calc(12px + env(safe-area-inset-left)); top: 66px; height: 36px; }
   #wind .wl { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--txt2); }
   #wind-a { font-size: 16px; color: #8fd3ff; letter-spacing: -2px; }
   #wind-v { font-size: 14px; font-weight: 700; }
-  #turninfo { position: absolute; left: 50%; transform: translateX(-50%); bottom: 80px; padding: 4px 12px; border-radius: 10px; background: rgba(10,13,28,.75); font-size: 12px; font-weight: 700; white-space: nowrap; }
-  #pass { position: absolute; right: calc(24px + env(safe-area-inset-right)); bottom: 248px; height: 40px; padding: 0 14px; font-size: 13px; border: 2px solid rgba(255,255,255,.35); }
+  #turninfo { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; padding: 4px 12px; border-radius: 10px; background: rgba(10,13,28,.75); font-size: 12px; font-weight: 700; white-space: nowrap; }
+  #pass { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 112px; height: 38px; padding: 0 14px; font-size: 13px; border: 2px solid rgba(255,255,255,.35); }
   #banner { position: fixed; inset: 0; z-index: 6; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 4px; pointer-events: none; }
   #banner .bt { font-family: Bungee, sans-serif; font-size: clamp(20px, 3.6vw, 38px); max-width: 90vw; color: #fff; text-shadow: 0 4px 0 rgba(0,0,0,.45), 0 0 24px rgba(0,0,0,.4); text-align: center; }
   #banner .bs { font-size: 16px; font-weight: 700; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
@@ -150,7 +152,7 @@
   @media (max-height: 420px) {
     #ammo { right: calc(144px + env(safe-area-inset-right)); bottom: 70px; } #ammo .n { font-size: 24px; }
     #fire { width: 112px; height: 112px; font-size: 16px; }
-    #zoom { bottom: 148px; right: calc(36px + env(safe-area-inset-right)); } #jump { bottom: 148px; right: calc(104px + env(safe-area-inset-right)); }
+    #zoom { bottom: 148px; right: calc(36px + env(safe-area-inset-right)); } #jump { bottom: 148px; right: calc(104px + env(safe-area-inset-right)); } #view { bottom: 148px; right: calc(166px + env(safe-area-inset-right)); }
     #joy { width: 130px; height: 130px; bottom: 22px; }
   }
 </style>
@@ -182,6 +184,7 @@
     <button class="btn" id="next" aria-label="Próxima arma"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></button>
   </div>
   <button class="btn" id="jump" aria-label="Pular"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 19V6M6 11l6-6 6 6"/></svg></button>
+  <button class="btn" id="view" aria-label="Trocar câmera: de trás ou primeira pessoa" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg></button>
   <button class="btn" id="zoom" aria-label="Mirar com zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
   <div id="duelhud">
     <div id="turn"><div id="turn-timer">45</div><div><div id="turn-team"></div><div id="turn-boss"></div><div id="turn-round"></div></div></div>
@@ -241,7 +244,7 @@
       <div class="row"><button class="opt" id="duel-back">Voltar</button></div>
     </div>
     <div id="loading" style="display:none;font-weight:700">Carregando sons…</div>
-    <div class="tips">Esquerda: andar · Direita: arrastar para mirar · Botão FOGO: atirar (segure no estilingue, pedra e granada)<br>No computador: WASD anda · Setas miram (Ctrl = mira fina) · F ou Enter atira (segure para carregar) · Espaço pula<br>Mouse: clique atira · botão direito + arrastar mira · Q/E ou 1–9 trocam arma · Z zoom · T câmera lenta · Shift corre</div>
+    <div class="tips">Esquerda: andar · Direita: arrastar para mirar · Botão FOGO: atirar (segure no estilingue, pedra e granada)<br>No computador: WASD anda · Setas miram (Ctrl = mira fina) · F ou Enter atira (segure para carregar) · Espaço pula<br>Mouse: clique atira · botão direito + arrastar mira · Q/E ou 1–9 trocam arma · Z zoom · V câmera (Duelo) · T câmera lenta · Shift corre</div>
   </div>
 </div>
 <div id="banner"><div class="bt"></div><div class="bs"></div></div>
@@ -254,7 +257,15 @@
 <script type="module" src="./js/main.js"></script>
 <script>
   // installable web app: only when running as its own site (not inside an embedded preview)
-  try { if (window.top === window && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js'); } catch (e) {}
+  try {
+    if (window.top === window && location.protocol === 'https:' && 'serviceWorker' in navigator) {
+      // when a new version takes over, reload once so the installed app shows it right away
+      const had = !!navigator.serviceWorker.controller;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !reloaded) { reloaded = true; location.reload(); } });
+      navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(() => {});
+    }
+  } catch (e) {}
 </script>
 </body>
 </html>

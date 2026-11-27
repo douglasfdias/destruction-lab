@@ -1079,6 +1079,7 @@ class Game {
       if (!this.started) return;
       if ((e.code === 'KeyF' || e.code === 'Enter' || e.code === 'KeyX') && !e.repeat) this.fireDown();
       if (e.code.startsWith('Digit')) { const n = +e.code.slice(5) - 1; if (n >= 0 && n < this.weapons.length) this.selectWeapon(n); }
+      if (e.code === 'KeyV' && this.duel) this.toggleView();
       if (e.code === 'KeyQ') this.selectWeapon((this.wi + this.weapons.length - 1) % this.weapons.length);
       if (e.code === 'KeyE') this.selectWeapon((this.wi + 1) % this.weapons.length);
       if (e.code === 'KeyT') this.toggleSlow();
@@ -1202,6 +1203,14 @@ class Game {
     this.updateWeaponCard();
   }
 
+  // duel: over-the-shoulder camera <-> first person (remembered between games)
+  toggleView(force) {
+    this.firstPerson = force != null ? force : !this.firstPerson;
+    this.savePref('fp', this.firstPerson ? '1' : '0');
+    $('view').classList.toggle('on', this.firstPerson);
+    if (force == null) this.toast(this.firstPerson ? 'PRIMEIRA PESSOA' : 'CÂMERA DE TRÁS');
+  }
+
   toggleZoom(force) {
     this.zoomed = force != null ? force : !this.zoomed;
     $('zoom').classList.toggle('on', this.zoomed);
@@ -1224,13 +1233,15 @@ class Game {
       b.addEventListener('click', () => { this.selectWeapon(i); this.closeArsenal(); });
       grid.appendChild(b);
     });
-    const on = (id, fn) => { const el = $(id); el.addEventListener('click', e => { e.stopPropagation(); this.audio.resume(); fn(); }); el.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); };
+    // touchstart (not click): phones don't send clicks while another finger is down, e.g. on the joystick
+    const on = (id, fn) => { const el = $(id); el.addEventListener('click', e => { e.stopPropagation(); this.audio.resume(); fn(); }); el.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); this.audio.resume(); fn(); }, { passive: false }); };
     on('prev', () => this.selectWeapon((this.wi + this.weapons.length - 1) % this.weapons.length));
     on('next', () => this.selectWeapon((this.wi + 1) % this.weapons.length));
     on('arsenal', () => this.openArsenal());
     on('arsenal-close', () => this.closeArsenal());
     on('zoom', () => this.toggleZoom());
     on('jump', () => { this.input.jump = true; });
+    on('view', () => this.toggleView());
     on('slow', () => this.toggleSlow());
     on('reset', () => { this.resetLevel(); this.toast('CENÁRIO NOVINHO'); });
     on('settings', () => { $('settings-panel').style.display = 'flex'; this.arsenalOpen = true; });
@@ -1304,6 +1315,7 @@ class Game {
       this.duel = new Duel(this, opts);
       $('logo').style.display = 'none'; $('score').style.display = 'none';
       $('slow').style.display = 'none'; $('reset').style.display = 'none';
+      $('view').style.display = ''; this.toggleView(this.loadPref('fp', '0') === '1');
       this.updateWeaponCard();
     } else {
       this.layout = LAYOUT;
@@ -1312,6 +1324,7 @@ class Game {
       this.resetLevel();
       $('logo').style.display = ''; $('score').style.display = '';
       $('slow').style.display = ''; $('reset').style.display = '';
+      $('view').style.display = 'none';
       $('cross').style.display = 'block';
       this.wi = -1;
       this.selectWeapon(0);

@@ -767,6 +767,12 @@ export class Duel {
       wantPos.copy(b.headPos()).addScaledVector(new THREE.Vector3(0, 0, -1).transformDirection(b.pivot.matrixWorld), 0.35);
       wantLook.copy(wantPos).addScaledVector(new THREE.Vector3(0, 0, -1).transformDirection(b.pivot.matrixWorld), 10);
       rate = 40; fov = g.weapons[g.wi].id === 'rifle50' ? 14 : 34;
+    } else if ((st === 'aim' || st === 'live') && g.firstPerson && !(st === 'aim' && this.isAI()) && !b.ko && !b.out) {
+      // first person: eyes at the boss's head, looking where the gun points (the gun is seen like in the Laboratório)
+      const fwd = new THREE.Vector3(0, 0, -1).transformDirection(b.pivot.matrixWorld);
+      wantPos.copy(b.headPos()).addScaledVector(fwd, 0.06);
+      wantLook.copy(wantPos).addScaledVector(fwd, 10);
+      rate = 40; fov = 70;
     } else {
       this.shoulderCam(b, wantPos, wantLook);
       rate = st === 'transition' || st === 'skip' ? 3.2 : 16;
