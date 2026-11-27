@@ -22,20 +22,20 @@ export const DUEL_LAYOUT = {
   house: { x0: -5, x1: 5, z0: -3, z1: 3 },
 };
 
-// three forts in a triangle around a central yard: each one for itself
-const C3 = [0, -6.5];
+// three forts in a triangle around a central yard, every front facing the middle: each one for itself
+const C3 = [0, 0.7];
 const faceYaw = (x, z) => Math.atan2(-(C3[0] - x), -(C3[1] - z));
 export const DUEL3_LAYOUT = {
   mode: 'duel', size: 64, n: 3,
-  spawns: [[0, 7.5, 12.6, faceYaw(0, 12.6)], [-15, 7.5, -16.6, faceYaw(-15, -16.6)], [15, 7.5, -16.6, faceYaw(15, -16.6)]],
-  hills: [{ x: -11, z: 0, h: 1.4, rx: 4, rz: 3.2 }, { x: 11, z: 0, h: 1.4, rx: 4, rz: 3.2 }, { x: 0, z: -14, h: 0.9, rx: 3.5, rz: 2.5 }],
-  cars: [[-8.5, -3.5, 0.6, 0xd8392b], [8.5, -3.5, -0.6, 0x2f6fd1]],
-  barrels: [[6.6, 9.6], [-6.6, 9.6], [-8.5, -11.5], [8.5, -11.5], [0.6, -8.4], [-0.6, -8.9]],
-  introLook: [0, 3, -5],
+  spawns: [[0, 7.5, 18.6, faceYaw(0, 18.6)], [-15.6, 7.5, -8, faceYaw(-15.6, -8)], [15.6, 7.5, -8, faceYaw(15.6, -8)]],
+  hills: [{ x: -9, z: 6, h: 1.3, rx: 3.6, rz: 3 }, { x: 9, z: 6, h: 1.3, rx: 3.6, rz: 3 }, { x: 0, z: -5, h: 0.7, rx: 3, rz: 2.2 }],
+  cars: [[-6.5, -17.5, 0.3, 0xd8392b], [6.5, -17.5, -0.3, 0x2f6fd1]],
+  barrels: [[6.6, 16.5], [-6.6, 16.5], [-15, -1.2], [15, -1.2], [-15, -14.8], [15, -14.8], [0.6, -2.5], [-0.6, -3]],
+  introLook: [0, 3, 1],
   forts: [
-    { x0: -5, x1: 5, z0: 9, z1: 15, face: -1, upper: 0xf2c7a0, trim: 0xffffff, banner: 0xff8a2a, tank: 0xff8a2a },
-    { x0: -20, x1: -10, z0: -19, z1: -13, face: 1, upper: 0xb9d3ea, trim: 0xffffff, banner: 0x3d6fd1, tank: 0x3d6fd1 },
-    { x0: 10, x1: 20, z0: -19, z1: -13, face: 1, upper: 0xc8e6b8, trim: 0xffffff, banner: 0x2f9e4f, tank: 0x2f9e4f },
+    { x0: -5, x1: 5, z0: 15, z1: 21, face: '-z', upper: 0xf2c7a0, trim: 0xffffff, banner: 0xff8a2a, tank: 0xff8a2a },
+    { x0: -18, x1: -12, z0: -13, z1: -3, face: '+x', upper: 0xb9d3ea, trim: 0xffffff, banner: 0x3d6fd1, tank: 0x3d6fd1 },
+    { x0: 12, x1: 18, z0: -13, z1: -3, face: '-x', upper: 0xc8e6b8, trim: 0xffffff, banner: 0x2f9e4f, tank: 0x2f9e4f },
   ],
   house: { x0: -5, x1: 5, z0: -3, z1: 3 },
 };

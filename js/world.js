@@ -215,49 +215,58 @@ export class World {
     for (let c = 0; c < N; c++) if (this.mat[c] && (this.flags[c] & 1)) this.totalHouse++;
   }
 
-  // ---------- duel: two mirrored forts ----------
+  // ---------- duel forts ----------
+  // A fort is built in local coordinates: a = across the front (left -> right as seen by the boss looking out),
+  // b = depth (0 = front wall, D-1 = back wall). f.face says where the front looks: '-z', '+z', '+x', '-x'
+  // (legacy -1/1 = '-z'/'+z'), so forts can face the yard from any side.
   buildFort(f, team) {
     const fl = 1 | (2 << team); // team bits: 2, 4, 8
-    const i0 = this.ci(f.x0), i1 = this.ci(f.x1) - 1, k0 = this.ck(f.z0), k1 = this.ck(f.z1) - 1;
-    const W = i1 - i0 + 1, D = k1 - k0 + 1;
-    const kf = f.face < 0 ? k0 : k1, kb = f.face < 0 ? k1 : k0; // front faces the enemy
+    const I0 = this.ci(f.x0), I1 = this.ci(f.x1) - 1, K0 = this.ck(f.z0), K1 = this.ck(f.z1) - 1;
+    const face = f.face === -1 ? '-z' : f.face === 1 ? '+z' : f.face;
+    const alongX = face === '-z' || face === '+z';
+    const W = alongX ? I1 - I0 + 1 : K1 - K0 + 1, D = alongX ? K1 - K0 + 1 : I1 - I0 + 1;
+    const map = {
+      '-z': (a, b) => [I0 + a, K0 + b],
+      '+z': (a, b) => [I1 - a, K1 - b],
+      '+x': (a, b) => [I1 - b, K0 + a],
+      '-x': (a, b) => [I0 + b, K1 - a],
+    }[face];
+    const S = (a, j, b, m, col) => { const [i, k] = map(a, b); this.set(i, j, k, m, col, fl); };
+    const G = (a, j, b) => { const [i, k] = map(a, b); return this.mat[idx(i, j, k)]; };
     const upper = f.upper, trim = f.trim;
-    this.box(i0 - 1, 0, k0 - 1, i1 + 1, 0, k1 + 1, MAT.FOUND, null, false);
-    const ring = (j0, j1, m, col) => { for (let j = j0; j <= j1; j++) { for (let i = i0; i <= i1; i++) { this.set(i, j, k0, m, col, fl); this.set(i, j, k1, m, col, fl); } for (let k = k0; k <= k1; k++) { this.set(i0, j, k, m, col, fl); this.set(i1, j, k, m, col, fl); } } };
+    this.box(I0 - 1, 0, K0 - 1, I1 + 1, 0, K1 + 1, MAT.FOUND, null, false);
+    const ring = (j0, j1, m, col) => { for (let j = j0; j <= j1; j++) { for (let a = 0; a < W; a++) { S(a, j, 0, m, col); S(a, j, D - 1, m, col); } for (let b = 0; b < D; b++) { S(0, j, b, m, col); S(W - 1, j, b, m, col); } } };
     ring(1, 6, MAT.BRICK, null);
     ring(8, 13, MAT.PLASTER, upper);
     ring(15, 15, MAT.BRICK, 0xd8cfc0);
     // crenellated parapet: the boss can hide behind the merlons
-    for (let i = i0; i <= i1; i++) if (((i - i0) >> 1) % 2 === 0) { this.set(i, 16, k0, MAT.BRICK, 0xd8cfc0, fl); this.set(i, 16, k1, MAT.BRICK, 0xd8cfc0, fl); }
-    for (let k = k0; k <= k1; k++) if (((k - k0) >> 1) % 2 === 0) { this.set(i0, 16, k, MAT.BRICK, 0xd8cfc0, fl); this.set(i1, 16, k, MAT.BRICK, 0xd8cfc0, fl); }
-    const cols = [[i0, k0], [i1, k0], [i0, k1], [i1, k1], [i0 + (W >> 1), k0], [i0 + (W >> 1), k1], [i0, k0 + (D >> 1)], [i1, k0 + (D >> 1)], [i0 + (W >> 1), k0 + (D >> 1)]];
-    for (const [a, b] of cols) for (let j = 1; j <= 13; j++) this.set(a, j, b, MAT.CONCRETE, null, fl);
-    this.box(i0, 7, k0, i1, 7, k1, MAT.CONCRETE, 0xc9c6bf, fl);
-    this.box(i0, 14, k0, i1, 14, k1, MAT.CONCRETE, 0xc9c6bf, fl);
+    for (let a = 0; a < W; a++) if ((a >> 1) % 2 === 0) { S(a, 16, 0, MAT.BRICK, 0xd8cfc0); S(a, 16, D - 1, MAT.BRICK, 0xd8cfc0); }
+    for (let b = 0; b < D; b++) if ((b >> 1) % 2 === 0) { S(0, 16, b, MAT.BRICK, 0xd8cfc0); S(W - 1, 16, b, MAT.BRICK, 0xd8cfc0); }
+    const cols = [[0, 0], [W - 1, 0], [0, D - 1], [W - 1, D - 1], [W >> 1, 0], [W >> 1, D - 1], [0, D >> 1], [W - 1, D >> 1], [W >> 1, D >> 1]];
+    for (const [a, b] of cols) for (let j = 1; j <= 13; j++) S(a, j, b, MAT.CONCRETE, null);
+    for (let a = 0; a < W; a++) for (let b = 0; b < D; b++) { S(a, 7, b, MAT.CONCRETE, 0xc9c6bf); S(a, 14, b, MAT.CONCRETE, 0xc9c6bf); }
     // interior wall
-    const mid = i0 + (W >> 1) + 3;
-    for (let j = 1; j <= 6; j++) for (let k = k0 + 1; k < k1; k++) if (!(j <= 4 && Math.abs(k - (k0 + (D >> 1))) <= 1)) this.set(mid, j, k, MAT.PLASTER, 0xe9e4da, fl);
+    const mid = (W >> 1) + 3;
+    for (let j = 1; j <= 6; j++) for (let b = 1; b < D - 1; b++) if (!(j <= 4 && Math.abs(b - (D >> 1)) <= 1)) S(mid, j, b, MAT.PLASTER, 0xe9e4da);
     // windows (front: 2 down, 3 up; sides: 1 each floor)
-    const win = (side, a0, j0, ww, hh) => {
-      for (let j = j0 - 1; j <= j0 + hh; j++) for (let a = a0 - 1; a <= a0 + ww; a++) {
-        const inner = j >= j0 && j < j0 + hh && a >= a0 && a < a0 + ww;
-        const p = side === 'f' ? [a, j, kf] : side === 'l' ? [i0, j, a] : [i1, j, a];
-        if (this.mat[idx(p[0], p[1], p[2])] === MAT.CONCRETE) continue;
-        this.set(p[0], p[1], p[2], inner ? MAT.GLASS : MAT.TRIM, inner ? null : trim, fl);
+    const win = (side, o0, j0, ww, hh) => {
+      for (let j = j0 - 1; j <= j0 + hh; j++) for (let o = o0 - 1; o <= o0 + ww; o++) {
+        const inner = j >= j0 && j < j0 + hh && o >= o0 && o < o0 + ww;
+        const [a, b] = side === 'f' ? [o, 0] : side === 'l' ? [0, o] : [W - 1, o];
+        if (G(a, j, b) === MAT.CONCRETE) continue;
+        S(a, j, b, inner ? MAT.GLASS : MAT.TRIM, inner ? null : trim);
       }
     };
-    win('f', i0 + 3, 2, 3, 3); win('f', i0 + 14, 2, 3, 3);
-    win('f', i0 + 2, 9, 3, 3); win('f', i0 + 8, 9, 3, 3); win('f', i0 + 15, 9, 3, 3);
-    win('l', k0 + 4, 2, 2, 3); win('r', k0 + 4, 9, 2, 3); win('l', k0 + 6, 9, 2, 3); win('r', k0 + 6, 2, 2, 3);
+    win('f', 3, 2, 3, 3); win('f', W - 6, 2, 3, 3);
+    win('f', 2, 9, 3, 3); win('f', (W >> 1) - 1, 9, 3, 3); win('f', W - 5, 9, 3, 3);
+    win('l', 4, 2, 2, 3); win('r', 4, 9, 2, 3); win('l', D - 6 > 4 ? D - 6 : 6, 9, 2, 3); win('r', D - 6 > 4 ? D - 6 : 6, 2, 2, 3);
     // back door
-    for (let j = 1; j <= 4; j++) for (let i = i0 + 5; i <= i0 + 6; i++) this.set(i, j, kb, MAT.WOOD, 0x8a5a32, fl);
-    // team banner stripe on the parapet
-    for (let i = i0 + 2; i <= i1 - 2; i++) this.set(i, 15, kf, MAT.PLASTER, f.banner, fl);
-    // wooden water-tank tower on the roof corner (a nice thing to topple)
-    // back corner on the boss's left, so it never blocks the over-the-shoulder camera
-    const ti = f.face < 0 ? i0 + 2 : i1 - 3, tk = f.face < 0 ? k1 - 3 : k0 + 2;
-    for (let j = 15; j <= 17; j++) { this.set(ti, j, tk, MAT.WOOD, 0x8a5a32, fl); this.set(ti + 1, j, tk, MAT.WOOD, 0x8a5a32, fl); this.set(ti, j, tk + 1, MAT.WOOD, 0x8a5a32, fl); this.set(ti + 1, j, tk + 1, MAT.WOOD, 0x8a5a32, fl); }
-    this.box(ti - 1, 18, tk - 1, ti + 2, 19, tk + 2, MAT.METAL, f.tank, fl);
+    for (let j = 1; j <= 4; j++) for (let a = 5; a <= 6; a++) S(a, j, D - 1, MAT.WOOD, 0x8a5a32);
+    // team banner stripe on the parapet, on the front
+    for (let a = 2; a <= W - 3; a++) S(a, 15, 0, MAT.PLASTER, f.banner);
+    // wooden water-tank tower on the roof, back corner on the boss's left (never blocks the over-the-shoulder camera)
+    for (let j = 15; j <= 17; j++) for (const a of [2, 3]) for (const b of [D - 4, D - 3]) S(a, j, b, MAT.WOOD, 0x8a5a32);
+    for (let j = 18; j <= 19; j++) for (let a = 1; a <= 4; a++) for (let b = D - 5; b <= D - 2; b++) S(a, j, b, MAT.METAL, f.tank);
   }
 
   buildDuel(layout) {
@@ -275,12 +284,11 @@ export class World {
     const wallX = (xa, xb, z, gap = 0.7) => { for (let i = this.ci(xa); i <= this.ci(xb); i++) { const x = OX + (i + 0.5) * VOX; if (Math.abs(x - (xa + xb) / 2) < gap) continue; for (let j = 0; j <= 2; j++) this.set(i, j, this.ck(z), MAT.CONCRETE, 0xb0aea8, false); } };
     const wallZ = (x, za, zb, gap = 0.7) => { for (let k = this.ck(za); k <= this.ck(zb); k++) { const z = OZ + (k + 0.5) * VOX; if (Math.abs(z - (za + zb) / 2) < gap) continue; for (let j = 0; j <= 2; j++) this.set(this.ci(x), j, k, MAT.CONCRETE, 0xb0aea8, false); } };
     if (layout.forts.length === 3) {
-      // triangle yard: a barricade in front of each fort's line of fire, crates and a shed in the middle
-      wallX(-4, 4, 1.5);
-      wallZ(-0.2, -19, -13, 1.0);
-      wallX(-12, -6, -8.5); wallX(6, 12, -8.5);
-      crate(-3.5, -5, 2); crate(-2.5, -5, 1); crate(3.2, -4.5, 2); crate(4.2, -4.7, 1); crate(-13, -4, 1); crate(13, -4, 2);
-      shed(-1.5, 1.5, -12, -10, true);
+      // a low barricade in front of each fort, crates around the middle, a shed to the south
+      wallX(-4, 4, 9);
+      wallZ(-7.5, -11, -5); wallZ(7.5, -11, -5);
+      crate(-3, -1.5, 2); crate(-2, -1.5, 1); crate(3, -0.5, 2); crate(4, -0.7, 1); crate(-0.5, 4.5, 1); crate(12.5, 11, 2); crate(-12.5, 11, 1);
+      shed(-1.5, 1.5, -15, -13, true);
     } else {
       // mid-field cover: low concrete barricade with a gap, stacked crates, a little wooden shed
       wallX(-4, 4, -2);
