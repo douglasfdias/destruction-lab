@@ -1157,7 +1157,7 @@ class Game {
         if (!s) continue;
         if (s.type === 'move') { this.input.mx = 0; this.input.mz = 0; knob.style.transform = ''; joy.classList.remove('active'); joy.style.left = ''; joy.style.top = ''; }
         // a short tap on the aerial map gives an order to the henchmen
-        else if (this.duel && this.duel.aerial && Math.hypot(t.clientX - s.x0, t.clientY - s.y0) < 14 && performance.now() - s.t0 < 900) this.duel.crew.aerialTap(t.clientX, t.clientY);
+        else if (this.duel && this.duel.aerial && Math.hypot(t.clientX - s.x0, t.clientY - s.y0) < 14) this.duel.crew.aerialTap(t.clientX, t.clientY);
         this.touches.delete(t.identifier);
       }
     };
@@ -1194,7 +1194,7 @@ class Game {
       if (this.duel.isAI()) return;
       if (!this.duel.canSwitch()) { this.toast(this.duel.switchBlockedMsg()); return; }
       const id = this.weapons[i].id;
-      if (this.duel.boss.stock[id] <= 0) { this.toast('SEM ESTOQUE DESSA ARMA'); return; }
+      if (this.duel.boss.stock[id] <= 0) { this.toast(this.duel.boss.locked.has(id) ? 'ARMA TRANCADA: PEGUE CAIXAS' : 'SEM ESTOQUE DESSA ARMA'); return; }
     }
     if (this.duel) this.duel.boss.wi = i;
     if (i === this.wi && this.weapons[i].equipped) return;
@@ -1266,11 +1266,14 @@ class Game {
     $('m-lab').addEventListener('click', () => this.start('lab'));
     $('m-duel').addEventListener('click', () => { $('modes').style.display = 'none'; $('duelopts').style.display = 'flex'; $('duelopts').parentElement.classList.add('duelmode'); });
     $('duel-back').addEventListener('click', () => { $('modes').style.display = 'flex'; $('duelopts').style.display = 'none'; $('duelopts').parentElement.classList.remove('duelmode'); });
-    document.querySelectorAll('#duelopts .opt[data-diff]').forEach(b => b.addEventListener('click', () => this.start('duel', { cpu: true, diff: b.dataset.diff })));
-    $('two-players').addEventListener('click', () => this.start('duel', { cpu: false }));
-    document.querySelectorAll('#duelopts .opt[data-rt]').forEach(b => b.addEventListener('click', () => this.start('duel', { n: 3, realtime: true, seats: ['human', 'cpu', 'cpu'], diff: b.dataset.rt })));
-    $('three-people').addEventListener('click', () => this.start('duel', { n: 3, seats: ['human', 'human', 'human'] }));
-    $('three-cpu').addEventListener('click', () => this.start('duel', { n: 3, seats: ['human', 'cpu', 'cpu'], diff: 'medio' }));
+    const ul = $('opt-unlock'); ul.checked = this.loadPref('unlock', '0') === '1';
+    ul.addEventListener('change', () => this.savePref('unlock', ul.checked ? '1' : '0'));
+    const U = o => Object.assign(o, { unlock: ul.checked });
+    document.querySelectorAll('#duelopts .opt[data-diff]').forEach(b => b.addEventListener('click', () => this.start('duel', U({ cpu: true, diff: b.dataset.diff }))));
+    $('two-players').addEventListener('click', () => this.start('duel', U({ cpu: false })));
+    document.querySelectorAll('#duelopts .opt[data-rt]').forEach(b => b.addEventListener('click', () => this.start('duel', U({ n: 3, realtime: true, seats: ['human', 'cpu', 'cpu'], diff: b.dataset.rt }))));
+    $('three-people').addEventListener('click', () => this.start('duel', U({ n: 3, seats: ['human', 'human', 'human'] })));
+    $('three-cpu').addEventListener('click', () => this.start('duel', U({ n: 3, seats: ['human', 'cpu', 'cpu'], diff: 'medio' })));
     on('pass', () => this.duel && this.duel.passTurn());
     $('handoff-ok').addEventListener('click', () => { this.audio.resume(); this.duel && this.duel.handoffReady(); });
     $('r-again').addEventListener('click', () => { $('result').style.display = 'none'; this.setMode('duel', this.duelOpts); });

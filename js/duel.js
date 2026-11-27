@@ -74,7 +74,7 @@ function mat(color, o = {}) { return new THREE.MeshStandardMaterial({ color, rou
 function bx(w, h, d, m, x, y, z) { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = true; return b; }
 
 class Boss {
-  constructor(game, team, layout, realtime) {
+  constructor(game, team, layout, realtime, unlock) {
     this.game = game; this.team = team; this.T = TEAMS[team];
     const sp = layout.spawns[team];
     this.pos = new THREE.Vector3(sp[0], sp[1], sp[2]); this.vel = new THREE.Vector3();
@@ -85,6 +85,8 @@ class Boss {
     this.bounds = { x0: f.x0 + 0.35, x1: f.x1 - 0.35, z0: f.z0 + 0.35, z1: f.z1 - 0.35 };
     this.stock = {}; for (const k in RULES) this.stock[k] = realtime ? (RT_STOCK[k] != null ? RT_STOCK[k] : Infinity) : RULES[k].stock;
     this.wi = realtime ? 2 : team === 0 ? 8 : 7;
+    this.locked = new Set();
+    if (unlock) { for (const k in RULES) if (k !== 'pedra' && k !== 'estilingue') { this.locked.add(k); this.stock[k] = 0; } this.wi = 1; }
     this.weapons = makeWeapons(game);
     this.pivot = new THREE.Object3D(); this.pivot.rotation.order = 'YXZ';
     game.scene.add(this.pivot);
@@ -145,13 +147,14 @@ export class Duel {
     this.game = game;
     this.n = opts.n || 2;
     this.realtime = !!opts.realtime;
+    this.unlockMode = !!opts.unlock; // start with rock + slingshot only; the rest comes in crates
     this.layout = opts.layout || DUEL_LAYOUT;
     this.seats = opts.seats || (opts.cpu ? ['human', 'cpu'] : ['human', 'human']);
     this.vsCPU = this.seats.includes('cpu');
     this.diff = opts.diff || 'medio';
     this.me = this.realtime ? 0 : -1;
     this.bosses = [];
-    for (let t = 0; t < this.n; t++) this.bosses.push(new Boss(game, t, this.layout, this.realtime));
+    for (let t = 0; t < this.n; t++) this.bosses.push(new Boss(game, t, this.layout, this.realtime, this.unlockMode));
     this.turn = 0; this.round = 1;
     this.state = 'intro'; this.stateT = 0;
     this.camPos = new THREE.Vector3(26, 14, 4); this.camLook = new THREE.Vector3(...this.layout.introLook);
@@ -166,7 +169,7 @@ export class Duel {
     this.buildBossHUD();
     this.aerial = false;
     this.crew = new Crew(this);
-    $('crewbar').style.top = this.realtime ? '112px' : '156px';
+    $('crewrow').style.top = this.realtime ? '112px' : '156px';
     if (this.realtime) this.activateAll();
     else this.activate(0, true);
     const names = this.bosses.map(b => b.T.name).join(' × ');
@@ -177,6 +180,12 @@ export class Duel {
 
   get boss() { return this.bosses[this.turn]; }
   isAI(team = this.turn) { return this.seats[team] === 'cpu'; }
+  // a crate unlocked a weapon: light ones without limit, heavy ones with 2 uses
+  unlockWeapon(b, id) {
+    b.locked.delete(id);
+    const heavy = this.realtime ? RT_STOCK[id] != null : RULES[id].stock !== Infinity;
+    b.stock[id] = heavy ? 2 : Infinity;
+  }
   liveTime() { return this.realtime ? this.liveT : this.totalT || 0; }
   get humans() { return this.seats.filter(s => s === 'human').length; }
 
@@ -352,13 +361,13 @@ export class Duel {
     const b = this.boss, w = this.game.weapons[this.game.wi];
     if (this.realtime) {
       if (this.state !== 'live' || b.ko || b.out || b.stunT > 0) return false;
-      if (b.stock[w.id] <= 0) { if (!this.isAI()) this.game.toast('ACABOU A MUNIÇÃO DESSA ARMA'); return false; }
+      if (b.stock[w.id] <= 0) { if (!this.isAI()) this.game.toast(b.locked.has(w.id) ? 'ARMA TRANCADA: PEGUE CAIXAS' : 'ACABOU A MUNIÇÃO DESSA ARMA'); return false; }
       return true;
     }
     if (this.state !== 'aim' || this.result) return false;
     if (this.lockedWeapon && this.lockedWeapon !== w) return false;
     if (this.firedAny && this.turnShots <= 0) return false;
-    if (!this.firedAny && b.stock[w.id] <= 0) { this.game.toast('SEM ESTOQUE DESSA ARMA'); return false; }
+    if (!this.firedAny && b.stock[w.id] <= 0) { this.game.toast(b.locked.has(w.id) ? 'ARMA TRANCADA: PEGUE CAIXAS' : 'SEM ESTOQUE DESSA ARMA'); return false; }
     return true;
   }
   canSwitch() {
@@ -903,7 +912,8 @@ export class Duel {
       if (!b.weapons[i]) return;
       const id = b.weapons[i].id, s = b.stock[id];
       const sp = c.querySelector('.stock');
-      if (sp) sp.textContent = this.realtime ? (s === Infinity ? '∞' : `x${s}`) : s === Infinity ? `${RULES[id].shots}/turno` : `x${s} · ${RULES[id].shots}/turno`;
+      if (sp && b.locked.has(id)) sp.textContent = 'trancada · vem nas caixas';
+      else if (sp) sp.textContent = this.realtime ? (s === Infinity ? '∞' : `x${s}`) : s === Infinity ? `${RULES[id].shots}/turno` : `x${s} · ${RULES[id].shots}/turno`;
       c.classList.toggle('empty', s <= 0);
     });
   }

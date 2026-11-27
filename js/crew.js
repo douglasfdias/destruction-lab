@@ -8,16 +8,18 @@ const $ = id => document.getElementById(id);
 const NAMES = [['Tião', 'Zeca', 'Nando'], ['Bira', 'Cido', 'Duda'], ['Lalo', 'Juca', 'Pipo']];
 const MAX_CREW = 3, CAP_HP = 40, DOWN_TIME = 12;
 const CONTENT = [
-  { id: 'municao', w: 30 }, { id: 'kit', w: 30 }, { id: 'armadilhas', w: 30 }, { id: 'capanga', w: 10 },
+  { id: 'arma', w: 0 }, { id: 'municao', w: 30 }, { id: 'kit', w: 30 }, { id: 'armadilhas', w: 30 }, { id: 'capanga', w: 10 },
 ];
+const WNAME = { pistola: 'PISTOLA', smg: 'SUBMETRALHADORA', shotgun: 'SHOTGUN 12', rifle50: 'RIFLE .50', granada: 'GRANADA', canhao: 'CANHÃO', rpg: 'LANÇA-FOGUETES', rifle50s: 'TIRO DE .50' };
+const WORDER = ['pistola', 'smg', 'shotgun', 'granada', 'rifle50', 'canhao', 'rpg'];
 const ORDERS = [
   { id: 'fetch', label: 'Buscar caixa', sub: 'corre até ela e volta' },
   { id: 'repair', label: 'Reparar', sub: 'tapa buracos · 1 kit', cost: 'kit' },
   { id: 'barricade', label: 'Barricada', sub: 'onde você mirar · 1 kit', cost: 'kit', place: true },
-  { id: 'mina', label: 'Armar mina', sub: 'explode quem pisar', cost: 'mina', place: true },
-  { id: 'mola', label: 'Armar mola', sub: 'joga pro alto', cost: 'mola', place: true },
-  { id: 'banana', label: 'Casca de banana', sub: 'escorrega e fica tonto', cost: 'banana', place: true },
-  { id: 'home', label: 'Voltar pro forte', sub: 'e pegar caixas sozinho' },
+  { id: 'mina', label: 'Mina', sub: 'explode quem pisar', cost: 'mina', place: true },
+  { id: 'mola', label: 'Mola', sub: 'joga pro alto', cost: 'mola', place: true },
+  { id: 'banana', label: 'Banana', sub: 'escorrega e fica tonto', cost: 'banana', place: true },
+  { id: 'home', label: 'Voltar', sub: 'pro forte, e pegar caixas sozinho' },
 ];
 const STATE_TXT = { idle: 'esperando', fetch: 'indo pegar a caixa', carry: 'trazendo a caixa', repair: 'indo reparar', barricade: 'indo erguer barricada', mina: 'indo armar mina', mola: 'indo armar mola', banana: 'indo pôr banana', move: 'indo pro lugar', home: 'voltando pro forte', work: 'trabalhando' };
 
@@ -78,7 +80,7 @@ export class Crew {
     this.center = new THREE.Vector3(...(this.layout.center || [0, 0, 0]));
     this.caps = []; this.crates = []; this.traps = [];
     this.stock = []; for (let t = 0; t < this.n; t++) this.stock.push({ kit: 1, mina: 1, mola: 1, banana: 2 });
-    this.crateT = 14; this.aiT = 0; this.selected = null; this.pending = null; this.aerial = false; this._uiT = 0;
+    this.crateT = duel.unlockMode ? 20 : 30; this.aiT = 0; this.selected = null; this.pending = null; this.aerial = false; this._uiT = 0;
     this.recordForts();
     for (let t = 0; t < this.n; t++) for (let i = 0; i < 2; i++) this.caps.push(new Capanga(this, t, i));
     this.mats = { crate: mat(0xb88a52), crateEdge: mat(0x7d5a30), chute: [mat(0xff8a2a, { r: 0.8 }), mat(0xffffff, { r: 0.8 })] };
@@ -91,8 +93,8 @@ export class Crew {
     for (const t of this.traps) this.scene.remove(t.mesh);
     this.caps.length = 0; this.traps.length = 0;
     this.setAerial(false);
-    $('crewbar').innerHTML = ''; $('crewbar').style.display = 'none';
-    $('orders').style.display = 'none'; $('aerial').style.display = 'none'; $('aerialhint').style.display = 'none';
+    $('crewbar').innerHTML = ''; $('crewrow').style.display = 'none';
+    $('orders').style.display = 'none'; $('aerialhint').style.display = 'none';
   }
 
   // ---------- geometry of the arena ----------
@@ -149,7 +151,7 @@ export class Crew {
     if (this.duel.state === 'intro' || this.duel.state === 'over') { this.updateVisuals(rdt); return; }
     // crates from the sky
     this.crateT -= dt;
-    if (this.crateT <= 0) { this.crateT = R(22, 32); if (this.crates.filter(k => k.state !== 'gone').length < 2) this.spawnCrate(); }
+    if (this.crateT <= 0) { this.crateT = this.duel.unlockMode ? R(32, 44) : R(40, 55); if (this.crates.filter(k => k.state !== 'gone').length < 2) this.spawnCrate(); }
     for (const k of this.crates) this.updateCrate(k, dt);
     this.crates = this.crates.filter(k => k.state !== 'gone');
     // computer-run teams decide what their henchmen do
@@ -405,13 +407,22 @@ export class Crew {
     this.removeCrate(k);
   }
   grant(t, c) {
-    let tot = CONTENT.reduce((a, x) => a + x.w, 0), r = Math.random() * tot, pick = CONTENT[0].id;
-    for (const x of CONTENT) { r -= x.w; if (r <= 0) { pick = x.id; break; } }
     const st = this.stock[t], boss = this.duel.bosses[t];
+    const W = CONTENT.map(x => ({ id: x.id, w: x.id === 'arma' ? (boss.locked.size ? 40 : 0) : x.id === 'municao' && this.duel.unlockMode ? 12 : x.w }));
+    let tot = W.reduce((a, x) => a + x.w, 0), r = Math.random() * tot, pick = W[1].id;
+    for (const x of W) { r -= x.w; if (r <= 0) { pick = x.id; break; } }
     let msg = '';
     if (pick === 'capanga' && this.teamCaps(t).length >= MAX_CREW) pick = 'kit';
+    if (pick === 'arma') {
+      // the next weapon in line most of the time, sometimes a surprise
+      const left = WORDER.filter(id => boss.locked.has(id));
+      const id = Math.random() < 0.65 ? left[0] : left[(Math.random() * left.length) | 0];
+      this.duel.unlockWeapon(boss, id);
+      msg = `ARMA NOVA: ${WNAME[id]}!`;
+    }
+    if (pick === 'municao' && !['rifle50', 'granada', 'canhao', 'rpg'].some(id => !boss.locked.has(id))) pick = 'kit';
     if (pick === 'municao') {
-      const ids = ['rifle50', 'granada', 'canhao', 'rpg'], id = ids[(Math.random() * ids.length) | 0];
+      const ids = ['rifle50', 'granada', 'canhao', 'rpg'].filter(id => !boss.locked.has(id)), id = ids[(Math.random() * ids.length) | 0];
       const names = { rifle50: 'TIRO DE .50', granada: 'GRANADA', canhao: 'BALA DE CANHÃO', rpg: 'FOGUETE' };
       if (boss.stock[id] !== Infinity) boss.stock[id]++;
       msg = `+1 ${names[id]}`;
@@ -424,7 +435,7 @@ export class Crew {
       msg = `+1 CAPANGA: ${nc.name.toUpperCase()}`;
     }
     this.game.audio.play('ui', { vol: 0.5, rate: 1.2 });
-    if (t === this.myTeam()) this.game.toast(`CAIXA: ${msg}`);
+    if (t === this.myTeam()) this.game.toast(pick === 'arma' ? msg : `CAIXA: ${msg}`);
     else this.game.toast(`${this.duel.bosses[t].T.name.toUpperCase()} PEGARAM UMA CAIXA`);
     this.duel.updateHUD(true);
   }
@@ -578,9 +589,7 @@ export class Crew {
 
   // ---------- UI: henchmen cards, orders, aerial view ----------
   buildUI() {
-    const bar = $('crewbar');
-    bar.style.display = 'flex';
-    $('aerial').style.display = '';
+    $('crewrow').style.display = 'flex';
     const tap = (el, fn) => {
       el.addEventListener('click', e => { e.stopPropagation(); fn(); });
       el.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); fn(); }, { passive: false });
@@ -607,8 +616,7 @@ export class Crew {
   updateUI() {
     const my = this.myTeam(), bar = $('crewbar');
     const show = my >= 0 && this.duel.state !== 'over';
-    bar.style.display = show ? 'flex' : 'none';
-    $('aerial').style.display = show ? '' : 'none';
+    $('crewrow').style.display = show ? 'flex' : 'none';
     if (!show) { if ($('orders').style.display !== 'none') this.closeOrders(); if (this.aerial) this.setAerial(false); return; }
     const caps = this.teamCaps(my);
     const key = my + ':' + caps.length;
@@ -649,6 +657,7 @@ export class Crew {
       const b = this.orderBtns[o.id];
       const none = (o.cost && st[o.cost] <= 0) || (o.id === 'fetch' && !this.crates.some(k => k.state === 'fall' || k.state === 'ground'));
       b.classList.toggle('off', !!none || c.ko);
+      b.querySelector('b').textContent = o.cost ? `${o.label} ×${st[o.cost]}` : o.label;
       b.classList.toggle('hl', this.pending === o.id);
     }
   }
