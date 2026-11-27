@@ -3,6 +3,7 @@
 import * as THREE from '../lib/three.module.min.js';
 import { makeWeapons, setSleeveColor } from './weapons.js';
 import { MAT } from './world.js';
+import { Crew } from './crew.js';
 
 const R = (a, b) => a + Math.random() * (b - a);
 const $ = id => document.getElementById(id);
@@ -13,7 +14,7 @@ export const DUEL_LAYOUT = {
   hills: [{ x: -10.5, z: -3, h: 1.6, rx: 4.5, rz: 3.5 }, { x: 11.5, z: 2.5, h: 1.3, rx: 4, rz: 3 }, { x: 1.5, z: 4.5, h: 0.6, rx: 2.2, rz: 1.5 }],
   cars: [[-14, -1, Math.PI / 2, 0xd8392b], [14.5, -3, -Math.PI / 2, 0x2f9e6a]],
   barrels: [[6.6, 9.6], [7.3, 10.2], [-6.6, -12.6], [-7.3, -13.2], [-1.2, -2.8]],
-  introLook: [0, 3, -2],
+  introLook: [0, 3, -2], center: [0, 0, -2],
   forts: [
     { x0: -5, x1: 5, z0: 9, z1: 15, face: -1, upper: 0xf2c7a0, trim: 0xffffff, banner: 0xff8a2a, tank: 0xff8a2a },
     { x0: -5, x1: 5, z0: -19, z1: -13, face: 1, upper: 0xb9d3ea, trim: 0xffffff, banner: 0x3d6fd1, tank: 0x3d6fd1 },
@@ -31,7 +32,7 @@ export const DUEL3_LAYOUT = {
   hills: [{ x: -9, z: 6, h: 1.3, rx: 3.6, rz: 3 }, { x: 9, z: 6, h: 1.3, rx: 3.6, rz: 3 }, { x: 0, z: -5, h: 0.7, rx: 3, rz: 2.2 }],
   cars: [[-6.5, -17.5, 0.3, 0xd8392b], [6.5, -17.5, -0.3, 0x2f6fd1]],
   barrels: [[6.6, 16.5], [-6.6, 16.5], [-15, -1.2], [15, -1.2], [-15, -14.8], [15, -14.8], [0.6, -2.5], [-0.6, -3]],
-  introLook: [0, 3, 1],
+  introLook: [0, 3, 1], center: [0, 0, 0.7],
   forts: [
     { x0: -5, x1: 5, z0: 15, z1: 21, face: '-z', upper: 0xf2c7a0, trim: 0xffffff, banner: 0xff8a2a, tank: 0xff8a2a },
     { x0: -18, x1: -12, z0: -13, z1: -3, face: '+x', upper: 0xb9d3ea, trim: 0xffffff, banner: 0x3d6fd1, tank: 0x3d6fd1 },
@@ -163,6 +164,9 @@ export class Duel {
     this.followP = null; this.impact = null; this.bulletCam = null;
     this.lastFireT = 0; this.result = null; this.outSeen = new Set();
     this.buildBossHUD();
+    this.aerial = false;
+    this.crew = new Crew(this);
+    $('crewbar').style.top = this.realtime ? '112px' : '156px';
     if (this.realtime) this.activateAll();
     else this.activate(0, true);
     const names = this.bosses.map(b => b.T.name).join(' × ');
@@ -173,9 +177,11 @@ export class Duel {
 
   get boss() { return this.bosses[this.turn]; }
   isAI(team = this.turn) { return this.seats[team] === 'cpu'; }
+  liveTime() { return this.realtime ? this.liveT : this.totalT || 0; }
   get humans() { return this.seats.filter(s => s === 'human').length; }
 
   dispose() {
+    if (this.crew) this.crew.dispose();
     for (const b of this.bosses) { for (const w of b.weapons) w.unequip(); b.dispose(); }
     this.game.scene.remove(this.trajPts);
     this.game.ctxAI = false; this.game.audio.ctxPos = null;
@@ -390,6 +396,8 @@ export class Duel {
 
   // ---------- damage ----------
   damage(b, dmg, cause, at) {
+    if (b.crewMember) return this.crew.damageCap(b, dmg, cause, at);
+    if (b.crate) return this.crew.hitCrate(b, dmg);
     if (b.ko || dmg <= 0.5 || this.state === 'over') return;
     b.hp -= dmg;
     const g = this.game;
@@ -436,14 +444,18 @@ export class Duel {
       b.vel.x += dir.x * k; b.vel.z += dir.z * k; b.vel.y += 3.5 * P * f + Math.max(0, dir.y) * k * 0.5;
       b.knockT = 0.5 + f * 0.6; b.onGround = false;
     }
+    if (this.crew) this.crew.explosionHit(pos, P, R0);
   }
 
   // ray vs boss spheres (chest + head) -> {b, t, head}
+  // ...also henchmen and crates in the air or on the ground (they can be shot too)
   rayBosses(o, d, maxT, exclude) {
     let best = null, bt = maxT;
-    for (const b of this.bosses) {
+    const list = this.crew ? [...this.bosses, ...this.crew.targets()] : this.bosses;
+    for (const b of list) {
       if (b === exclude || b.ko) continue;
-      for (const [c, r, head] of [[b.chest(), 0.38, false], [b.headPos(), 0.26, true]]) {
+      const spheres = b.crate ? [[b.pos, 0.5, false]] : b.crewMember ? [[b.chest(), 0.3, false], [b.headPos(), 0.2, true]] : [[b.chest(), 0.38, false], [b.headPos(), 0.26, true]];
+      for (const [c, r, head] of spheres) {
         const oc = o.clone().sub(c);
         const bb = oc.dot(d), cc = oc.lengthSq() - r * r, disc = bb * bb - cc;
         if (disc < 0) continue;
@@ -609,6 +621,7 @@ export class Duel {
 
   // ---------- per-frame ----------
   update(rdt, dt) {
+    this.totalT = (this.totalT || 0) + rdt;
     if (this.realtime) return this.updateRT(rdt, dt);
     const g = this.game, t = performance.now() / 1000;
     this.stateT += rdt;
@@ -616,7 +629,7 @@ export class Duel {
     // bosses: active one takes input when it's a human aiming; all get physics (falls, knockback)
     for (const bb of this.bosses) {
       if (bb.knockT > 0) bb.knockT -= dt;
-      const active = bb === b && this.state === 'aim' && !this.isAI() && !bb.ko;
+      const active = bb === b && this.state === 'aim' && !this.isAI() && !bb.ko && !this.aerial;
       g.player = bb;
       g.updatePlayer(dt, bb, active ? g.input : this.zeroInput, false);
       bb.update(dt, t);
@@ -626,6 +639,7 @@ export class Duel {
     // weapons of the active boss
     for (const w of b.weapons) if (w.equipped) w.update(dt);
     this.watchdog(rdt);
+    this.crew.update(dt, rdt);
     // state machine
     switch (this.state) {
       case 'intro':
@@ -681,7 +695,7 @@ export class Duel {
     for (const bb of this.bosses) {
       if (bb.knockT > 0) bb.knockT -= dt;
       if (bb.stunT > 0) bb.stunT = Math.max(0, bb.stunT - rdt);
-      const control = bb === me && live && !bb.ko && !bb.out && !(bb.stunT > 0);
+      const control = bb === me && live && !bb.ko && !bb.out && !(bb.stunT > 0) && !this.aerial;
       g.player = bb;
       g.updatePlayer(dt, bb, control ? g.input : this.zeroInput, false);
       bb.update(dt, t);
@@ -692,6 +706,7 @@ export class Duel {
     for (const bb of this.bosses) this.withCtx(bb, () => { for (const w of bb.weapons) if (w.equipped) w.update(dt); });
     if ((me.stunT > 0 || me.ko || me.out) && g.weapons[g.wi].isDown) g.weapons[g.wi].up();
     this.watchdog(rdt);
+    this.crew.update(dt, rdt);
     if (live) {
       for (const bb of this.bosses) if (bb !== me && !bb.ko && !bb.out) this.withCtx(bb, () => { this.watchdog(rdt); this.updateAIRT(bb, rdt); });
       this.windT -= rdt;
@@ -743,6 +758,15 @@ export class Duel {
       const a = this.stateT * 0.3;
       wantLook.copy(loser.pos).add(new THREE.Vector3(0, 1, 0));
       wantPos.copy(wantLook).add(new THREE.Vector3(Math.sin(a) * 8, 4, Math.cos(a) * 8)); rate = 2;
+    } else if (this.aerial) {
+      // aerial view: the whole yard from above, to give orders to the henchmen
+      // frame all the forts, leaving room for the HUD at the top and bottom
+      const F = this.layout.forts;
+      const x0 = Math.min(...F.map(f => f.x0)) - 3, x1 = Math.max(...F.map(f => f.x1)) + 3, z0 = Math.min(...F.map(f => f.z0)) - 3, z1 = Math.max(...F.map(f => f.z1)) + 3;
+      fov = 55;
+      const tv = Math.tan(fov / 2 * Math.PI / 180), asp = cam.aspect || 2;
+      const h = Math.max((z1 - z0) / (2 * tv) * 1.3, (x1 - x0) / (2 * tv * asp) * 1.15);
+      wantLook.set((x0 + x1) / 2, 0, (z0 + z1) / 2); wantPos.set((x0 + x1) / 2, h, (z0 + z1) / 2 + h * 0.08); rate = 5;
     } else if ((st === 'flight' || st === 'impact') && this.bulletCam && this.bulletCam.t < 1.6) {
       const bc = this.bulletCam, k = Math.min(1, bc.t);
       const p = bc.from.clone().lerp(bc.to, k * k);
@@ -796,14 +820,15 @@ export class Duel {
     const scoped = (st === 'aim' || st === 'live') && g.zoomed;
     b.model.visible = !scoped && cam.position.distanceTo(b.headPos()) > 1.3;
     for (const w of b.weapons) if (w.equipped) w.model.visible = !scoped || !!w.anim;
-    $('cross').style.display = (st === 'aim' && !this.isAI()) || (st === 'live' && !b.ko && !b.out) ? 'block' : 'none';
+    $('cross').style.display = !this.aerial && ((st === 'aim' && !this.isAI()) || (st === 'live' && !b.ko && !b.out)) ? 'block' : 'none';
+    if (this.aerial) b.model.visible = true;
   }
 
   updateTrajectory() {
     const g = this.game, b = this.boss, pts = this.trajPts;
     const w = g.weapons[g.wi];
     const aiming = this.realtime ? this.state === 'live' && !b.ko && !b.out : this.state === 'aim' && !(this.isAI() && this.diff !== 'facil');
-    const spec = aiming && w.preview ? w.preview() : null;
+    const spec = aiming && !this.aerial && w.preview ? w.preview() : null;
     if (!spec) { pts.visible = false; return; }
     const pos = pts.geometry.attributes.position, n = pos.count;
     const dir = new THREE.Vector3(0, 0, -1).transformDirection(b.pivot.matrixWorld);

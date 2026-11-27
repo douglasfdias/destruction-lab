@@ -1080,6 +1080,7 @@ class Game {
       if ((e.code === 'KeyF' || e.code === 'Enter' || e.code === 'KeyX') && !e.repeat) this.fireDown();
       if (e.code.startsWith('Digit')) { const n = +e.code.slice(5) - 1; if (n >= 0 && n < this.weapons.length) this.selectWeapon(n); }
       if (e.code === 'KeyV' && this.duel) this.toggleView();
+      if (e.code === 'KeyM' && this.duel && this.duel.crew) { this.duel.crew.setAerial(!this.duel.aerial); if (this.duel.aerial && document.pointerLockElement) document.exitPointerLock(); }
       if (e.code === 'KeyQ') this.selectWeapon((this.wi + this.weapons.length - 1) % this.weapons.length);
       if (e.code === 'KeyE') this.selectWeapon((this.wi + 1) % this.weapons.length);
       if (e.code === 'KeyT') this.toggleSlow();
@@ -1098,6 +1099,7 @@ class Game {
     this.rDrag = null;
     document.addEventListener('mousedown', e => {
       if (!this.started || (e.target !== surfEl() && e.target !== canvas())) return;
+      if (e.button === 0 && this.duel && this.duel.aerial) { if (locked()) document.exitPointerLock(); else this.duel.crew.aerialTap(e.clientX, e.clientY); return; }
       if (e.button === 0) {
         if (!locked() && !this.triedLock) { this.triedLock = true; try { const p = surfEl().requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (er) {} }
         this.fireDown();
@@ -1127,7 +1129,7 @@ class Game {
         if (left && ![...this.touches.values()].some(v => v.type === 'move')) {
           this.touches.set(t.identifier, { type: 'move', x0: t.clientX, y0: t.clientY });
           joy.style.left = (t.clientX - 75) + 'px'; joy.style.top = (t.clientY - 75) + 'px'; joy.classList.add('active');
-        } else this.touches.set(t.identifier, { type: 'look', x: t.clientX, y: t.clientY });
+        } else this.touches.set(t.identifier, { type: 'look', x: t.clientX, y: t.clientY, x0: t.clientX, y0: t.clientY, t0: performance.now() });
       }
       e.preventDefault();
     };
@@ -1154,6 +1156,8 @@ class Game {
         const s = this.touches.get(t.identifier);
         if (!s) continue;
         if (s.type === 'move') { this.input.mx = 0; this.input.mz = 0; knob.style.transform = ''; joy.classList.remove('active'); joy.style.left = ''; joy.style.top = ''; }
+        // a short tap on the aerial map gives an order to the henchmen
+        else if (this.duel && this.duel.aerial && Math.hypot(t.clientX - s.x0, t.clientY - s.y0) < 14 && performance.now() - s.t0 < 900) this.duel.crew.aerialTap(t.clientX, t.clientY);
         this.touches.delete(t.identifier);
       }
     };

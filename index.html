@@ -68,6 +68,23 @@
   #jump { position: absolute; right: calc(116px + env(safe-area-inset-right)); bottom: 178px; width: 52px; height: 52px; border-radius: 26px; border: 2px solid rgba(255,255,255,.35); }
   #view { position: absolute; right: calc(180px + env(safe-area-inset-right)); bottom: 178px; width: 52px; height: 52px; border-radius: 26px; border: 2px solid rgba(255,255,255,.35); }
   #view.on { background: var(--y); color: #1a1a1a; border-color: #fff; }
+  #aerial { position: absolute; right: calc(244px + env(safe-area-inset-right)); bottom: 178px; width: 52px; height: 52px; border-radius: 26px; border: 2px solid rgba(255,255,255,.35); }
+  #aerial.on { background: var(--y); color: #1a1a1a; border-color: #fff; }
+  #crewbar { display: none; position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 112px; gap: 6px; }
+  .capcard { width: 104px; height: 42px; padding: 3px 8px; border-radius: 10px; border: 2px solid rgba(255,255,255,.25); background: rgba(10,13,28,.85); color: #fff; font-family: inherit; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; text-align: left; }
+  .capcard.sel { border-color: var(--y); }
+  .capcard b { font-size: 12px; } .capcard i { display: block; width: 100%; height: 4px; border-radius: 2px; background: #2b3150; } .capcard u { display: block; height: 4px; border-radius: 2px; text-decoration: none; }
+  .capcard span { font-size: 10px; color: var(--txt2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  #aerialhint { display: none; pointer-events: none; position: absolute; left: 50%; transform: translateX(-50%); top: 74px; padding: 6px 14px; border-radius: 10px; background: rgba(10,13,28,.85); font-size: 12px; font-weight: 700; white-space: nowrap; }
+  #orders { display: none; position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 56px; width: min(330px, 44vw); padding: 10px; border-radius: 14px; background: rgba(10,13,28,.92); flex-direction: column; gap: 8px; z-index: 5; right: auto; bottom: auto; align-items: stretch; justify-content: flex-start; }
+  #orders .ohead { display: flex; align-items: center; gap: 8px; } #orders .ohead b { font-family: Bungee, sans-serif; font-size: 15px; } #orders .ohead span { flex: 1; font-size: 11px; color: var(--txt2); }
+  #orders-close { width: 34px; height: 34px; border-radius: 9px; background: #2b3150; } #orders-close svg { width: 16px; height: 16px; }
+  #orders-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .ordbtn { height: 44px; padding: 0 9px; border-radius: 9px; border: 2px solid transparent; background: #2b3150; color: #fff; font-family: inherit; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; text-align: left; gap: 1px; }
+  .ordbtn b { font-size: 12px; } .ordbtn span { font-size: 10px; color: var(--txt2); }
+  .ordbtn.off { opacity: .4; } .ordbtn.hl { border-color: var(--y); }
+  #orders.mini #orders-grid, #orders.mini #orders-stock { display: none; }
+  #orders-stock { font-size: 11px; font-weight: 600; color: #e3e6f3; border-top: 1px solid #2b3150; padding-top: 6px; }
   #toasts { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .toast { padding: 6px 14px; border-radius: 10px; background: var(--y); color: #1a1a1a; font-family: Bungee, sans-serif; font-size: 17px; box-shadow: 0 5px 0 #a87a00; transform: rotate(-3deg); animation: pop .25s ease-out; transition: opacity .5s, transform .5s; white-space: nowrap; }
   .toast.out { opacity: 0; transform: rotate(-3deg) translateY(-14px); }
@@ -152,7 +169,7 @@
   @media (max-height: 420px) {
     #ammo { right: calc(144px + env(safe-area-inset-right)); bottom: 70px; } #ammo .n { font-size: 24px; }
     #fire { width: 112px; height: 112px; font-size: 16px; }
-    #zoom { bottom: 148px; right: calc(36px + env(safe-area-inset-right)); } #jump { bottom: 148px; right: calc(104px + env(safe-area-inset-right)); } #view { bottom: 148px; right: calc(166px + env(safe-area-inset-right)); }
+    #zoom { bottom: 148px; right: calc(36px + env(safe-area-inset-right)); } #jump { bottom: 148px; right: calc(104px + env(safe-area-inset-right)); } #view { bottom: 148px; right: calc(166px + env(safe-area-inset-right)); } #aerial { bottom: 148px; right: calc(228px + env(safe-area-inset-right)); } #orders { top: 52px; } .ordbtn { height: 40px; }
     #joy { width: 130px; height: 130px; bottom: 22px; }
   }
 </style>
@@ -185,6 +202,14 @@
   </div>
   <button class="btn" id="jump" aria-label="Pular"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 19V6M6 11l6-6 6 6"/></svg></button>
   <button class="btn" id="view" aria-label="Trocar câmera: de trás ou primeira pessoa" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg></button>
+  <button class="btn" id="aerial" aria-label="Vista aérea do campo" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg></button>
+  <div id="crewbar"></div>
+  <div id="aerialhint">VISTA AÉREA · toque no capanga e depois no lugar</div>
+  <div class="panel" id="orders">
+    <div class="ohead"><b id="orders-name"></b><span id="orders-hint"></span><button class="btn" id="orders-close" aria-label="Fechar ordens"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="orders-grid"></div>
+    <div id="orders-stock"></div>
+  </div>
   <button class="btn" id="zoom" aria-label="Mirar com zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
   <div id="duelhud">
     <div id="turn"><div id="turn-timer">45</div><div><div id="turn-team"></div><div id="turn-boss"></div><div id="turn-round"></div></div></div>
@@ -244,7 +269,7 @@
       <div class="row"><button class="opt" id="duel-back">Voltar</button></div>
     </div>
     <div id="loading" style="display:none;font-weight:700">Carregando sons…</div>
-    <div class="tips">Esquerda: andar · Direita: arrastar para mirar · Botão FOGO: atirar (segure no estilingue, pedra e granada)<br>No computador: WASD anda · Setas miram (Ctrl = mira fina) · F ou Enter atira (segure para carregar) · Espaço pula<br>Mouse: clique atira · botão direito + arrastar mira · Q/E ou 1–9 trocam arma · Z zoom · V câmera (Duelo) · T câmera lenta · Shift corre</div>
+    <div class="tips">Esquerda: andar · Direita: arrastar para mirar · Botão FOGO: atirar (segure no estilingue, pedra e granada)<br>No computador: WASD anda · Setas miram (Ctrl = mira fina) · F ou Enter atira (segure para carregar) · Espaço pula<br>Mouse: clique atira · botão direito + arrastar mira · Q/E ou 1–9 trocam arma · Z zoom · V câmera · M vista aérea (Duelo) · T câmera lenta · Shift corre</div>
   </div>
 </div>
 <div id="banner"><div class="bt"></div><div class="bs"></div></div>
