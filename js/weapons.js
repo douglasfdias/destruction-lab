@@ -214,8 +214,8 @@ class Slingshot extends Weapon {
     const g = this.game;
     this.ready = false;
     const pos = new THREE.Vector3(0, 0.02, -0.5).applyMatrix4(g.aimFrame.matrixWorld);
-    const wob = this.charge > 0.85 ? (this.charge - 0.85) * 0.12 : 0;
-    g.spawnProjectile('ball', pos, this.aimDir(0.004 + wob).multiplyScalar(16 + power * 36));
+    const wob = this.charge > 1 ? (this.charge - 1) * 0.04 : 0;
+    g.spawnProjectile('ball', pos, this.aimDir(0.0015 + wob).multiplyScalar(16 + Math.min(1, power) * 36));
     g.onFired(this);
     g.audio.play('snap', { vol: 0.7, rate: 0.9 + power * 0.3 });
     g.audio.play('whoosh', { vol: 0.35 * power, rate: 1.5 });

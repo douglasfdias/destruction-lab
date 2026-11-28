@@ -210,7 +210,10 @@ export class Duel {
     const n = 90;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-    const p = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffe14a, size: 0.32, sizeAttenuation: true, transparent: true, opacity: 0.9, depthWrite: false }));
+    // round dots (not squares), smaller; the first stretch near the camera is skipped so it never fills the view
+    const cv = document.createElement('canvas'); cv.width = cv.height = 32;
+    const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(16, 16, 13, 0, Math.PI * 2); cx.fill();
+    const p = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffe14a, size: 7 * Math.min(2, window.devicePixelRatio || 1), map: new THREE.CanvasTexture(cv), alphaTest: 0.5, sizeAttenuation: false, transparent: true, opacity: 0.85, depthWrite: false }));
     p.frustumCulled = false; p.visible = false; p.renderOrder = 6;
     this.game.scene.add(p);
     return p;
@@ -848,7 +851,7 @@ export class Duel {
     for (let s = 0; s < 400 && k < n; s++) {
       v.y += spec.grav * h; v.addScaledVector(g.wind, spec.wind * h);
       p.addScaledVector(v, h);
-      if (s % 3 === 0) { pos.setXYZ(k++, p.x, p.y, p.z); }
+      if (s % 3 === 0 && p.distanceTo(g.camera.position) > 2.5) { pos.setXYZ(k++, p.x, p.y, p.z); }
       if (p.y < g.terrain.heightAt(p.x, p.z) || (s > 8 && g.world.matAt(p.x, p.y, p.z))) break;
     }
     for (let i = k; i < n; i++) pos.setXYZ(i, p.x, p.y, p.z);
