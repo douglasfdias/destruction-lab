@@ -1,7 +1,7 @@
 // Phase 3: henchmen (capangas), crates from the sky, traps, repairs and barricades, plus the aerial-view orders.
 // Lives inside a Duel. Capangas keep working in real time in every duel mode (also while turns change).
 import * as THREE from '../lib/three.module.min.js';
-import { MAT, worldToCell, VOX, NX, NZ } from './world.js';
+import { MAT, worldToCell, VOX, NX, NZ, OX, OZ } from './world.js';
 
 const R = (a, b) => a + Math.random() * (b - a);
 const $ = id => document.getElementById(id);
@@ -21,6 +21,20 @@ const ORDERS = [
   { id: 'banana', label: 'Banana', sub: 'escorrega e fica tonto', cost: 'banana', place: true },
   { id: 'home', label: 'Voltar', sub: 'pro forte, e pegar caixas sozinho' },
 ];
+// small stroke icons (24x24) used for the henchmen's actions and orders
+export const ICON = {
+  fetch: '<path d="M4 8h16v12H4zM4 12h16M12 8v12"/>',
+  repair: '<path d="M4 20l9-9M12 4l8 8-4 1-5-5z"/>',
+  barricade: '<path d="M3 9h18v10H3zM3 14h18M9 9v5M15 14v5"/>',
+  mina: '<ellipse cx="12" cy="15" rx="8" ry="3"/><path d="M12 12V8M10 6h4"/>',
+  mola: '<path d="M6 20l12-2-12-3 12-3-12-3 12-3"/>',
+  banana: '<path d="M4 8c3 9 13 10 16 2-5 4-11 3-16-2z"/>',
+  home: '<path d="M3 11l9-7 9 7M6 10v10h12V10"/>',
+  grab: '<path d="M4 9h16v11H4zM4 13h16M12 9v11M9 5l3-3 3 3"/>',
+  drop: '<path d="M4 9h16v11H4zM4 13h16M12 9v11M9 2l3 3 3-3"/>',
+  boss: '<path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/>',
+};
+export const svgIcon = (k, s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
 const STATE_TXT = { idle: 'esperando', fetch: 'indo pegar a caixa', carry: 'trazendo a caixa', repair: 'indo reparar', barricade: 'indo erguer barricada', mina: 'indo armar mina', mola: 'indo armar mola', banana: 'indo pôr banana', move: 'indo pro lugar', home: 'voltando pro forte', work: 'trabalhando' };
 
 function mat(color, o = {}) { return new THREE.MeshStandardMaterial({ color, roughness: o.r != null ? o.r : 0.7, metalness: o.m || 0, emissive: o.e || 0 }); }
@@ -35,7 +49,8 @@ class Capanga {
     this.T = T; this.name = NAMES[team][idx % 3];
     this.pos = crew.homePoint(team, idx).clone(); this.vel = new THREE.Vector3();
     this.yaw = crew.homeYaw(team); this.hp = CAP_HP; this.ko = false; this.downT = 0;
-    this.stunT = 0; this.knockT = 0; this.onGround = true; this.task = null; this.state = 'idle'; this.auto = true;
+    this.stunT = 0; this.knockT = 0; this.onGround = true; this.task = null; this.state = 'idle'; this.auto = !!crew.duel.realtime;
+    this.pitch = 0; this.bob = 0; this.bobAmp = 0; this.stepT = 0; this.driven = false;
     this.workT = 0; this.stuckT = 0; this.lastPos = this.pos.clone(); this.side = Math.random() < 0.5 ? 1 : -1; this.walk = 0;
     this.build(T);
   }
@@ -104,11 +119,41 @@ export class Crew {
     return face === '-z' ? new THREE.Vector3(cx, 0, f.z0) : face === '+z' ? new THREE.Vector3(cx, 0, f.z1) : face === '+x' ? new THREE.Vector3(f.x1, 0, cz) : new THREE.Vector3(f.x0, 0, cz);
   }
   faceDir(t) { const d = FACE_DIR[faceOf(this.fort(t))]; return new THREE.Vector3(d[0], 0, d[1]); }
-  homePoint(t, i = 0) {
-    const fp = this.frontPoint(t), d = this.faceDir(t), side = new THREE.Vector3(-d.z, 0, d.x);
-    const p = fp.addScaledVector(d, 2.1).addScaledVector(side, (i % 3 - 1) * 1.6 + (i === 1 ? 3.2 : 0));
-    p.y = this.ground(p.x, p.z, 4);
+  // fort-local coordinates (cells): a across the front, left to right as seen from inside looking out; b = depth from the front
+  fortDims(t) {
+    const f = this.fort(t), w = this.game.world, face = faceOf(f);
+    const I0 = w.ci(f.x0), I1 = w.ci(f.x1) - 1, K0 = w.ck(f.z0), K1 = w.ck(f.z1) - 1;
+    const alongX = face === '-z' || face === '+z';
+    return { face, I0, I1, K0, K1, W: alongX ? I1 - I0 + 1 : K1 - K0 + 1, D: alongX ? K1 - K0 + 1 : I1 - I0 + 1 };
+  }
+  local(t, a, b) {
+    const F = this.fortDims(t);
+    const [i, k] = { '-z': [F.I0 + a, F.K0 + b], '+z': [F.I1 - a, F.K1 - b], '+x': [F.I1 - b, F.K0 + a], '-x': [F.I0 + b, F.K1 - a] }[F.face];
+    const p = new THREE.Vector3(OX + (i + 0.5) * VOX, 0, OZ + (k + 0.5) * VOX);
+    p.y = this.ground(p.x, p.z, 1.2);
     return p;
+  }
+  toLocal(t, p) {
+    const F = this.fortDims(t), i = (p.x - OX) / VOX - 0.5, k = (p.z - OZ) / VOX - 0.5;
+    return { '-z': { a: i - F.I0, b: k - F.K0 }, '+z': { a: F.I1 - i, b: F.K1 - k }, '+x': { a: k - F.K0, b: F.I1 - i }, '-x': { a: F.K1 - k, b: i - F.I0 } }[F.face];
+  }
+  // home = inside, on the ground floor, one at each end (one rocket doesn't get them both)
+  homePoint(t, i = 0) {
+    const F = this.fortDims(t);
+    const spots = [[3, F.D >> 1], [F.W - 4, F.D >> 1], [8, F.D - 3]];
+    const [a, b] = spots[i % 3];
+    return this.local(t, a, b);
+  }
+  inOwn(t, p) { const f = this.fort(t); return p.x > f.x0 && p.x < f.x1 && p.z > f.z0 && p.z < f.z1; }
+  // waypoints between the inside of the fort and the yard, through the back door and around the corner
+  route(c, target) {
+    const t = c.team, F = this.fortDims(t), fromIn = this.inOwn(t, c.pos), toIn = this.inOwn(t, target);
+    if (fromIn === toIn) return [];
+    const L = this.toLocal(t, fromIn ? target : c.pos);
+    const sa = L.a < F.W / 2 ? -3.5 : F.W + 2.5, front = L.b < F.D / 2;
+    const inDoor = this.local(t, 5.5, F.D - 2.2), outDoor = this.local(t, 5.5, F.D + 2.6);
+    const back = this.local(t, sa, F.D + 2.6), frontC = this.local(t, sa, -3);
+    return fromIn ? [inDoor, outDoor, back, ...(front ? [frontC] : [])] : [...(front ? [frontC] : []), back, outDoor, inDoor];
   }
   homeYaw(t) { const d = this.faceDir(t); return Math.atan2(-d.x, -d.z); }
   ground(x, z, y = 3) { return this.game.groundUnder(x, y, z); }
@@ -156,7 +201,7 @@ export class Crew {
     this.crates = this.crates.filter(k => k.state !== 'gone');
     // computer-run teams decide what their henchmen do
     this.aiT -= dt;
-    if (this.aiT <= 0) { this.aiT = 1.2; for (let t = 0; t < this.n; t++) if (this.isCPU(t) && !this.teamOut(t)) this.thinkAI(t); }
+    if (this.aiT <= 0) { this.aiT = 1.2; if (this.duel.realtime) for (let t = 0; t < this.n; t++) if (this.isCPU(t) && !this.teamOut(t)) this.thinkAI(t); }
     this.autoFetch();
     for (const c of this.caps) this.updateCap(c, dt);
     for (const tr of this.traps) this.updateTrap(tr, dt);
@@ -168,6 +213,7 @@ export class Crew {
 
   // idle henchmen run for crates on their own: one per team per crate, the closest one
   autoFetch() {
+    if (!this.duel.realtime) return; // by turns nobody runs for a crate on his own
     for (const k of this.crates) {
       if (k.state === 'carried' || k.state === 'gone') continue;
       for (let t = 0; t < this.n; t++) {
@@ -184,12 +230,33 @@ export class Crew {
     }
   }
 
+  // by turns: at the start of the computer's turn, maybe send a henchman (crate, repair, a trap) before shooting
+  aiTurn(t) {
+    const st = this.stock[t], caps = this.teamCaps(t).filter(c => !c.ko);
+    if (!caps.length) return false;
+    if (caps.some(c => c.task && (c.task.type === 'carry' || c.task.type === 'fetch'))) return true;
+    if (this.duel.fortPct(t) > 0.08 && st.kit > 0) { const c = caps[0]; c.setTask({ type: 'repair', target: this.homePoint(t, c.idx) }); return true; }
+    const k = this.crates.find(k => k.state === 'ground' || (k.state === 'fall' && k.pos.y - k.landing.y < 10));
+    if (k) {
+      let best = null, bd = 1e9;
+      for (const c of caps) { const dd = c.pos.distanceTo(k.landing); if (dd < bd) { bd = dd; best = c; } }
+      if (best && bd < 30) { best.setTask({ type: 'fetch', crate: k }); return true; }
+    }
+    const traps = ['mina', 'mola', 'banana'].filter(x => st[x] > 0);
+    if (traps.length && Math.random() < 0.3) {
+      const p = this.center.clone().add(new THREE.Vector3(R(-6, 6), 0, R(-5, 5)));
+      if (!this.inFort(p.x, p.z, 1.5)) { caps[(Math.random() * caps.length) | 0].setTask({ type: traps[(Math.random() * traps.length) | 0], target: this.clampYard(p) }); return true; }
+    }
+    return false;
+  }
+  aiTurnDone(t) { return !this.teamCaps(t).some(c => !c.ko && c.task && c.task.type !== 'home'); }
+
   thinkAI(t) {
     const st = this.stock[t], caps = this.teamCaps(t).filter(c => !c.ko);
     const idle = caps.filter(c => !c.busy());
     if (!idle.length) return;
     const dmg = this.duel.fortPct(t);
-    if (dmg > 0.05 && st.kit > 0 && !caps.some(c => c.task && c.task.type === 'repair')) { idle[0].setTask({ type: 'repair', target: this.frontPoint(t).addScaledVector(this.faceDir(t), 1.3) }); return; }
+    if (dmg > 0.05 && st.kit > 0 && !caps.some(c => c.task && c.task.type === 'repair')) { idle[0].setTask({ type: 'repair', target: this.homePoint(t, idle[0].idx) }); return; }
     const c = idle[(Math.random() * idle.length) | 0];
     const traps = ['mina', 'mola', 'banana'].filter(k => st[k] > 0);
     // traps now and then, not all at once (more likely when a crate is coming down)
@@ -214,17 +281,27 @@ export class Crew {
     const g = this.game;
     if (c.ko) {
       c.downT -= dt;
-      if (c.downT <= 0) { c.ko = false; c.hp = CAP_HP; c.pos.copy(this.homePoint(c.team, c.idx)); c.vel.set(0, 0, 0); c.setTask(null); c.auto = true; }
+      if (c.downT <= 0) { c.ko = false; c.hp = CAP_HP; c.pos.copy(this.homePoint(c.team, c.idx)); c.vel.set(0, 0, 0); c.setTask(null); c.auto = !!this.duel.realtime; }
       return;
     }
     if (this.teamOut(c.team) && !c.ko) { c.hp = 0; c.ko = true; c.downT = 1e9; if (c.carrying) this.dropCrate(c); return; }
     if (c.stunT > 0) c.stunT -= dt;
     if (c.knockT > 0) c.knockT -= dt;
+    if (c.driven) {
+      const busy = c.stunT > 0 || c.workT > 0;
+      g.updatePlayer(dt, c, busy ? this.duel.zeroInput : g.input, false);
+      if (busy && c.workT > 0) this.driveWork(c, dt);
+      if (c.carrying && this.inOwn(c.team, c.pos)) { const k = c.carrying; c.carrying = null; this.removeCrate(k); this.grant(c.team, c); }
+      c.walk += dt * Math.hypot(c.vel.x, c.vel.z) * 2.2;
+      return;
+    }
+    // by turns only the team whose turn it is moves; everyone else stays put
+    const canAct = this.duel.realtime || (c.team === this.duel.turn && this.duel.state === 'aim');
     // nothing to do and away from the fort: walk back
-    if (!c.task && c.auto && c.stunT <= 0 && Math.hypot(c.pos.x - this.homePoint(c.team, c.idx).x, c.pos.z - this.homePoint(c.team, c.idx).z) > 1.5) c.setTask({ type: 'home' });
+    if (this.duel.realtime && !c.task && c.auto && c.stunT <= 0 && Math.hypot(c.pos.x - this.homePoint(c.team, c.idx).x, c.pos.z - this.homePoint(c.team, c.idx).z) > 1.5) c.setTask({ type: 'home' });
     let want = null, speed = c.carrying ? 2.7 : 3.4;
     const task = c.task;
-    if (task && c.stunT <= 0 && c.knockT <= 0) {
+    if (task && canAct && c.stunT <= 0 && c.knockT <= 0) {
       let target = task.target;
       if (task.type === 'fetch') {
         const k = task.crate;
@@ -232,9 +309,12 @@ export class Crew {
         target = k.state === 'ground' ? k.pos : k.landing;
       }
       if (task.type === 'carry' || task.type === 'home') target = this.homePoint(c.team, c.idx);
+      if (!task.wps) task.wps = this.route(c, target);
+      let wp = false;
+      if (task.wps.length) { const w0 = task.wps[0]; if (Math.hypot(w0.x - c.pos.x, w0.z - c.pos.z) < 0.7) task.wps.shift(); if (task.wps.length) { target = task.wps[0]; wp = true; } }
       const dx = target.x - c.pos.x, dz = target.z - c.pos.z, dist = Math.hypot(dx, dz);
       const arrive = task.type === 'fetch' ? 0.9 : task.type === 'repair' ? 1.2 : 0.7;
-      if (dist > arrive) want = new THREE.Vector3(dx / dist, 0, dz / dist);
+      if (dist > arrive || wp) want = new THREE.Vector3(dx / dist, 0, dz / dist);
       else this.arrive(c, dt);
     }
     // steering around walls and crates of blocks
@@ -285,7 +365,7 @@ export class Crew {
       for (let t = 0; t < this.n; t++) if (t !== c.team && k.claimed[t]) { const o = k.claimed[t]; k.claimed[t] = null; if (o.task && o.task.crate === k) o.setTask(null); }
       g.audio.play('woodhit', { pos: k.pos, vol: 0.5, rate: 1.3 });
       if (mine) g.toast(`${c.name.toUpperCase()} PEGOU A CAIXA!`);
-      c.task = { type: 'carry', crate: k }; c.state = 'carry';
+      c.task = { type: 'carry', crate: k }; c.state = 'carry'; // route home is planned on the next step
       return;
     }
     if (task.type === 'carry') {
@@ -294,7 +374,7 @@ export class Crew {
       c.setTask(null);
       return;
     }
-    if (task.type === 'home' || task.type === 'move') { c.state = 'idle'; if (task.type === 'home') { c.task = null; c.auto = true; } return; }
+    if (task.type === 'home' || task.type === 'move') { c.state = 'idle'; if (task.type === 'home') { c.task = null; c.auto = !!this.duel.realtime; } return; }
     // jobs that take a moment of work on the spot
     c.state = 'work'; c.workT += dt;
     c.yaw += Math.sin(c.workT * 18) * 0.02;
@@ -309,7 +389,8 @@ export class Crew {
     else this.placeTrap(task.type, c.team, c.pos);
     if (ok && cost) st[cost]--;
     if (mine) g.toast(task.type === 'repair' ? (ok ? 'FORTE REPARADO!' : 'NADA PRA REPARAR') : task.type === 'barricade' ? 'BARRICADA ERGUIDA!' : task.type === 'mina' ? 'MINA ARMADA' : task.type === 'mola' ? 'MOLA ARMADA' : 'BANANA NO CHÃO');
-    c.setTask({ type: 'home' });
+    // real time: walk back in; by turns: stay where the job was done (moving costs turns)
+    c.setTask(this.duel.realtime ? { type: 'home' } : null);
   }
 
   damageCap(c, dmg, cause, at) {
@@ -523,14 +604,14 @@ export class Crew {
     this.game.audio.play('rubble', { pos: near, vol: 0.6, rate: 1.3 });
     return true;
   }
-  buildBarricade(t, at) {
-    const w = this.game.world, d = this.faceDir(t);
-    const alongX = Math.abs(d.z) > 0.5;
+  buildBarricade(t, at, alongX0) {
+    const w = this.game.world, d = alongX0 != null ? new THREE.Vector3() : this.faceDir(t);
+    const alongX = alongX0 != null ? alongX0 : Math.abs(d.z) > 0.5;
     const i0 = w.ci(at.x), k0 = w.ck(at.z);
     const j0 = Math.max(0, Math.floor(this.game.terrain.heightAt(at.x, at.z) / VOX));
     let placed = 0;
     for (let a = -2; a <= 2; a++) for (let j = j0; j <= j0 + 2; j++) {
-      const i = alongX ? i0 + a : i0 + (d.x > 0 ? 1 : -1), k = alongX ? k0 + (d.z > 0 ? 1 : -1) : k0 + a;
+      const i = alongX ? i0 + a : i0 + Math.sign(d.x), k = alongX ? k0 + Math.sign(d.z) : k0 + a;
       if (w.get(i, j, k)) continue;
       w.set(i, j, k, MAT.CONCRETE, 0xb0aea8, false); placed++;
     }
@@ -595,54 +676,146 @@ export class Crew {
       el.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); fn(); }, { passive: false });
     };
     this._tap = tap;
+    const cur = () => this.game.duel && this.game.duel.crew;
     if (!this.game._crewUIBound) {
       this.game._crewUIBound = true;
-      tap($('orders-close'), () => this.game.duel && this.game.duel.crew && this.game.duel.crew.closeOrders());
-      tap($('aerial'), () => this.game.duel && this.game.duel.crew && this.game.duel.crew.setAerial(!this.game.duel.crew.aerial));
+      tap($('orders-close'), () => cur() && cur().closeOrders());
+      tap($('aerial'), () => cur() && cur().setAerial(!cur().aerial));
+      // actions while driving a henchman (by turns)
+      const col = $('capact');
+      for (const id of ['mina', 'mola', 'banana', 'barricade', 'repair']) {
+        const b = document.createElement('button');
+        b.className = 'actbtn'; b.dataset.id = id; b.setAttribute('aria-label', ORDERS.find(o => o.id === id).label);
+        b.innerHTML = svgIcon(id, 20) + '<span class="cnt"></span>';
+        tap(b, () => cur() && cur().act(id));
+        col.appendChild(b);
+      }
+      tap($('capgrab'), () => cur() && cur().act('grab'));
     }
     const grid = $('orders-grid');
     grid.innerHTML = '';
     this.orderBtns = {};
     for (const o of ORDERS) {
       const b = document.createElement('button');
-      b.className = 'ordbtn';
-      b.innerHTML = `<b>${o.label}</b><span>${o.sub}</span>`;
+      b.className = 'ordbtn'; b.setAttribute('aria-label', o.label);
+      b.innerHTML = svgIcon(o.id === 'fetch' ? 'fetch' : o.id, 20) + '<span class="cnt"></span>';
       tap(b, () => this.order(o.id));
       grid.appendChild(b); this.orderBtns[o.id] = b;
     }
     this._barKey = '';
     this.updateUI();
   }
+  // round avatars: by turns, the boss first, then the henchmen (tap = take control); in real time, tap = orders
   updateUI() {
-    const my = this.myTeam(), bar = $('crewbar');
-    const show = my >= 0 && this.duel.state !== 'over';
+    const my = this.myTeam(), bar = $('crewbar'), d = this.duel;
+    const show = my >= 0 && d.state !== 'over';
     $('crewrow').style.display = show ? 'flex' : 'none';
     if (!show) { if ($('orders').style.display !== 'none') this.closeOrders(); if (this.aerial) this.setAerial(false); return; }
+    if (this.selected && this.selected.team !== my) this.closeOrders();
     const caps = this.teamCaps(my);
-    const key = my + ':' + caps.length;
+    const key = my + ':' + caps.length + ':' + d.realtime;
     if (key !== this._barKey) {
       this._barKey = key; bar.innerHTML = '';
+      if (!d.realtime) {
+        const bb = document.createElement('button');
+        bb.className = 'capav boss'; bb.setAttribute('aria-label', 'Chefe');
+        bb.innerHTML = svgIcon('boss', 18) + '<u></u>';
+        this._tap(bb, () => this.takeControl(null));
+        this.bossAv = bb; bar.appendChild(bb);
+      }
       for (const c of caps) {
         const b = document.createElement('button');
-        b.className = 'capcard';
-        b.innerHTML = `<b></b><i><u></u></i><span></span>`;
-        this._tap(b, () => this.select(c));
+        b.className = 'capav'; b.setAttribute('aria-label', c.name);
+        b.innerHTML = `<i>${c.name[0]}</i><u></u>`;
+        this._tap(b, () => d.realtime ? this.select(c) : this.takeControl(c));
         c.card = b; bar.appendChild(b);
       }
     }
+    const boss = d.bosses[my];
+    if (this.bossAv) {
+      this.bossAv.style.borderColor = !d.ctrl ? '#FFC531' : boss.T.css;
+      this.bossAv.querySelector('u').style.width = Math.max(0, boss.hp) + '%';
+      this.bossAv.querySelector('u').style.background = boss.T.css;
+    }
     for (const c of caps) {
       const b = c.card; if (!b) continue;
-      b.querySelector('b').textContent = c.name;
-      b.querySelector('u').style.width = Math.max(0, c.hp / CAP_HP * 100) + '%';
-      b.querySelector('u').style.background = c.T.css;
-      b.querySelector('span').textContent = c.ko ? `desmaiado · ${Math.ceil(c.downT)} s` : c.stunT > 0 ? `tonto · ${Math.ceil(c.stunT)} s` : STATE_TXT[c.state] || c.state;
-      b.classList.toggle('sel', this.selected === c);
+      const u = b.querySelector('u');
+      u.style.width = Math.max(0, c.hp / CAP_HP * 100) + '%'; u.style.background = c.T.css;
+      b.style.borderColor = d.ctrl === c || this.selected === c ? '#FFC531' : c.T.css;
+      b.classList.toggle('ko', c.ko || c.stunT > 0);
+      b.querySelector('i').textContent = c.ko ? 'z' : c.name[0];
+      b.title = c.name;
     }
+    // action column while driving
+    const st = this.stock[my];
+    document.querySelectorAll('#capact .actbtn').forEach(b => {
+      const id = b.dataset.id, o = ORDERS.find(x => x.id === id);
+      b.querySelector('.cnt').textContent = o.cost ? st[o.cost] : '';
+      b.classList.toggle('off', !!o.cost && st[o.cost] <= 0);
+    });
+    const dc = d.ctrl;
+    if (dc) { const g = $('capgrab'); g.innerHTML = svgIcon(dc.carrying ? 'drop' : 'grab', 30) + `<span>${dc.carrying ? 'LARGAR' : 'PEGAR'}</span>`; }
     if ($('orders').style.display !== 'none' && this.selected) this.fillOrders();
+  }
+  // by turns: switch between the boss and a henchman, only on your own turn before the shot
+  takeControl(c) {
+    const d = this.duel, g = this.game;
+    g.audio.resume();
+    if (d.realtime) return;
+    if (d.state !== 'aim' || d.isAI()) { g.toast('SÓ NA SUA VEZ'); return; }
+    if (d.firedAny) { g.toast('DEPOIS DO TIRO, SÓ O CHEFE SE MEXE'); return; }
+    if (c && c.ko) { g.toast(`${c.name.toUpperCase()} ESTÁ DESMAIADO`); return; }
+    if (c && c.team !== d.turn) return;
+    d.setCtrl(c);
+    g.notice(c ? `Você está com o ${c.name}` : 'De volta ao chefe');
+  }
+  // actions of the henchman you are driving
+  act(id) {
+    const d = this.duel, c = d.ctrl, g = this.game;
+    if (!c || c.stunT > 0 || c.workT > 0) return;
+    const st = this.stock[c.team];
+    if (id === 'grab') {
+      if (c.carrying) { this.dropCrate(c); g.notice('Largou a caixa'); return; }
+      const k = this.crates.find(k => k.state === 'ground' && Math.hypot(k.pos.x - c.pos.x, k.pos.z - c.pos.z) < 1.5 && Math.abs(k.pos.y - c.pos.y) < 1.4);
+      if (!k) { g.notice(this.crates.some(k => k.state === 'fall') ? 'Espere a caixa cair' : 'Chegue perto de uma caixa'); return; }
+      k.state = 'carried'; k.carrier = c; c.carrying = k;
+      for (let t = 0; t < this.n; t++) if (k.claimed[t] && k.claimed[t] !== c) { const o = k.claimed[t]; k.claimed[t] = null; if (o.task && o.task.crate === k) o.setTask(null); }
+      g.audio.play('woodhit', { pos: k.pos, vol: 0.5, rate: 1.3 });
+      g.notice('Pegou! Leve para dentro do forte');
+      this.updateUI();
+      return;
+    }
+    const o = ORDERS.find(x => x.id === id);
+    if (o.cost && st[o.cost] <= 0) { g.notice('Sem estoque: pegue caixas'); return; }
+    if (id === 'repair') {
+      const f = this.fort(c.team), m = 2.5;
+      if (!(c.pos.x > f.x0 - m && c.pos.x < f.x1 + m && c.pos.z > f.z0 - m && c.pos.z < f.z1 + m)) { g.notice('Chegue perto do seu forte'); return; }
+    }
+    c.workT = 0.001; c.workJob = id; c.vel.x = 0; c.vel.z = 0; c.state = 'work';
+  }
+  driveWork(c, dt) {
+    const g = this.game, st = this.stock[c.team], id = c.workJob;
+    c.workT += dt;
+    const need = id === 'repair' ? 3 : id === 'barricade' ? 2.4 : 0.9;
+    if (Math.floor(c.workT * 3) !== Math.floor((c.workT - dt) * 3)) g.audio.play(id === 'repair' || id === 'barricade' ? 'stones' : 'click', { pos: c.pos, vol: 0.35, rate: R(0.9, 1.3) });
+    if (c.workT < need) return;
+    const cost = ORDERS.find(o => o.id === id).cost;
+    const fwd = new THREE.Vector3(-Math.sin(c.yaw), 0, -Math.cos(c.yaw));
+    const at = c.pos.clone().addScaledVector(fwd, id === 'barricade' ? 1.6 : 0.9);
+    let ok = true;
+    if (id === 'repair') ok = this.repairFort(c.team, c.pos);
+    else if (id === 'barricade') ok = this.buildBarricade(c.team, at, Math.abs(fwd.z) > Math.abs(fwd.x));
+    else this.placeTrap(id, c.team, at);
+    if (ok && cost) st[cost]--;
+    g.notice(id === 'repair' ? (ok ? 'Forte reparado' : 'Nada para reparar') : id === 'barricade' ? 'Barricada erguida' : id === 'mina' ? 'Mina armada' : id === 'mola' ? 'Mola armada' : 'Banana no chão');
+    c.workT = 0; c.workJob = null; c.state = 'idle';
+    this.updateUI();
   }
   select(c) {
     this.game.audio.resume();
     this.selected = c; this.pending = null;
+    // under the row of avatars, so the map button stays free
+    $('orders').style.top = (parseInt($('crewrow').style.top || '112', 10) + 52) + 'px';
     $('orders').style.display = 'flex';
     this.fillOrders();
     this.updateUI();
@@ -651,13 +824,13 @@ export class Crew {
     const c = this.selected, st = this.stock[c.team];
     $('orders').classList.toggle('mini', !!(this.pending && this.aerial));
     $('orders-name').textContent = c.name.toUpperCase();
-    $('orders-hint').textContent = this.pending ? (this.aerial ? 'Toque no mapa onde colocar' : 'Mire no chão e toque de novo') : c.ko ? 'desmaiado' : 'escolha uma ordem';
-    $('orders-stock').textContent = `Kits ${st.kit} · Minas ${st.mina} · Molas ${st.mola} · Bananas ${st.banana}`;
+    const pend = this.pending && ORDERS.find(o => o.id === this.pending);
+    $('orders-hint').textContent = pend ? `${pend.label}: ${this.aerial ? 'toque no mapa' : 'mire no chão e toque de novo'}` : c.ko ? 'desmaiado' : (this._lastOrder || 'escolha uma ordem');
     for (const o of ORDERS) {
       const b = this.orderBtns[o.id];
       const none = (o.cost && st[o.cost] <= 0) || (o.id === 'fetch' && !this.crates.some(k => k.state === 'fall' || k.state === 'ground'));
       b.classList.toggle('off', !!none || c.ko);
-      b.querySelector('b').textContent = o.cost ? `${o.label} ×${st[o.cost]}` : o.label;
+      b.querySelector('.cnt').textContent = o.cost ? st[o.cost] : '';
       b.classList.toggle('hl', this.pending === o.id);
     }
   }
@@ -666,7 +839,8 @@ export class Crew {
   aimPoint() {
     const d = this.duel, b = d.bosses[this.myTeam()], g = this.game;
     const dir = new THREE.Vector3(0, 0, -1).transformDirection(b.pivot.matrixWorld);
-    const o = b.headPos().addScaledVector(dir, 0.6);
+    // from standing eye height (the boss may be crouched while giving orders)
+    const o = new THREE.Vector3(b.pos.x, b.pos.y + 1.6, b.pos.z).addScaledVector(dir, 0.6);
     let T = 60;
     const wh = g.world.raycast(o, dir, 60); if (wh) T = Math.min(T, wh.t);
     const th = g.terrain.raycast(o, dir, 60); if (th) T = Math.min(T, th.t);
@@ -680,6 +854,7 @@ export class Crew {
     if (!c) return;
     if (c.ko) { g.toast(`${c.name.toUpperCase()} ESTÁ DESMAIADO`); return; }
     const o = ORDERS.find(x => x.id === id), st = this.stock[c.team];
+    this._lastOrder = o.label;
     if (o.cost && st[o.cost] <= 0) { g.toast('SEM ESTOQUE: PEGUE CAIXAS'); return; }
     if (id === 'fetch') {
       const ks = this.crates.filter(k => k.state === 'fall' || k.state === 'ground');
@@ -690,7 +865,7 @@ export class Crew {
       c.setTask({ type: 'fetch', crate: k }); c.auto = true;
       g.toast(`${c.name.toUpperCase()}: TÔ INDO!`); this.closeOrders(); return;
     }
-    if (id === 'repair') { c.setTask({ type: 'repair', target: this.frontPoint(c.team).addScaledVector(this.faceDir(c.team), 1.3) }); g.toast(`${c.name.toUpperCase()} VAI REPARAR`); this.closeOrders(); return; }
+    if (id === 'repair') { c.setTask({ type: 'repair', target: this.homePoint(c.team, c.idx) }); g.toast(`${c.name.toUpperCase()} VAI REPARAR`); this.closeOrders(); return; }
     if (id === 'home') { c.setTask({ type: 'home' }); c.auto = true; this.closeOrders(); return; }
     if (o.place) {
       if (this.aerial) { this.pending = id; this.fillOrders(); return; }

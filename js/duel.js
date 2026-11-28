@@ -10,14 +10,14 @@ const $ = id => document.getElementById(id);
 
 export const DUEL_LAYOUT = {
   mode: 'duel', size: 64, n: 2,
-  spawns: [[0, 7.5, 12.6, 0], [0, 7.5, -16.6, Math.PI]],
-  hills: [{ x: -10.5, z: -3, h: 1.6, rx: 4.5, rz: 3.5 }, { x: 11.5, z: 2.5, h: 1.3, rx: 4, rz: 3 }, { x: 1.5, z: 4.5, h: 0.6, rx: 2.2, rz: 1.5 }],
+  spawns: [[0, 7.5, 9.6, 0], [0, 7.5, -13.6, Math.PI]],
+  hills: [{ x: -10.5, z: -3, h: 1.6, rx: 4.5, rz: 3.5 }, { x: 11.5, z: 2.5, h: 1.3, rx: 4, rz: 3 }, { x: 1.5, z: 2.5, h: 0.6, rx: 2.2, rz: 1.5 }],
   cars: [[-14, -1, Math.PI / 2, 0xd8392b], [14.5, -3, -Math.PI / 2, 0x2f9e6a]],
   barrels: [[6.6, 9.6], [7.3, 10.2], [-6.6, -12.6], [-7.3, -13.2], [-1.2, -2.8]],
   introLook: [0, 3, -2], center: [0, 0, -2],
   forts: [
-    { x0: -5, x1: 5, z0: 9, z1: 15, face: -1, upper: 0xf2c7a0, trim: 0xffffff, banner: 0xff8a2a, tank: 0xff8a2a },
-    { x0: -5, x1: 5, z0: -19, z1: -13, face: 1, upper: 0xb9d3ea, trim: 0xffffff, banner: 0x3d6fd1, tank: 0x3d6fd1 },
+    { x0: -5, x1: 5, z0: 6, z1: 12, face: -1, upper: 0xf2c7a0, trim: 0xffffff, banner: 0xff8a2a, tank: 0xff8a2a },
+    { x0: -5, x1: 5, z0: -16, z1: -10, face: 1, upper: 0xb9d3ea, trim: 0xffffff, banner: 0x3d6fd1, tank: 0x3d6fd1 },
   ],
   // fields used by shared code paths
   house: { x0: -5, x1: 5, z0: -3, z1: 3 },
@@ -28,15 +28,15 @@ const C3 = [0, 0.7];
 const faceYaw = (x, z) => Math.atan2(-(C3[0] - x), -(C3[1] - z));
 export const DUEL3_LAYOUT = {
   mode: 'duel', size: 64, n: 3,
-  spawns: [[0, 7.5, 18.6, faceYaw(0, 18.6)], [-15.6, 7.5, -8, faceYaw(-15.6, -8)], [15.6, 7.5, -8, faceYaw(15.6, -8)]],
+  spawns: [[0, 7.5, 14.6, faceYaw(0, 14.6)], [-12.6, 7.5, -6, faceYaw(-12.6, -6)], [12.6, 7.5, -6, faceYaw(12.6, -6)]],
   hills: [{ x: -9, z: 6, h: 1.3, rx: 3.6, rz: 3 }, { x: 9, z: 6, h: 1.3, rx: 3.6, rz: 3 }, { x: 0, z: -5, h: 0.7, rx: 3, rz: 2.2 }],
   cars: [[-6.5, -17.5, 0.3, 0xd8392b], [6.5, -17.5, -0.3, 0x2f6fd1]],
-  barrels: [[6.6, 16.5], [-6.6, 16.5], [-15, -1.2], [15, -1.2], [-15, -14.8], [15, -14.8], [0.6, -2.5], [-0.6, -3]],
+  barrels: [[6.6, 12.5], [-6.6, 12.5], [-12, 0.8], [12, 0.8], [-12, -12.8], [12, -12.8], [0.6, -2.5], [-0.6, -3]],
   introLook: [0, 3, 1], center: [0, 0, 0.7],
   forts: [
-    { x0: -5, x1: 5, z0: 15, z1: 21, face: '-z', upper: 0xf2c7a0, trim: 0xffffff, banner: 0xff8a2a, tank: 0xff8a2a },
-    { x0: -18, x1: -12, z0: -13, z1: -3, face: '+x', upper: 0xb9d3ea, trim: 0xffffff, banner: 0x3d6fd1, tank: 0x3d6fd1 },
-    { x0: 12, x1: 18, z0: -13, z1: -3, face: '-x', upper: 0xc8e6b8, trim: 0xffffff, banner: 0x2f9e4f, tank: 0x2f9e4f },
+    { x0: -5, x1: 5, z0: 11, z1: 17, face: '-z', upper: 0xf2c7a0, trim: 0xffffff, banner: 0xff8a2a, tank: 0xff8a2a },
+    { x0: -15, x1: -9, z0: -11, z1: -1, face: '+x', upper: 0xb9d3ea, trim: 0xffffff, banner: 0x3d6fd1, tank: 0x3d6fd1 },
+    { x0: 9, x1: 15, z0: -11, z1: -1, face: '-x', upper: 0xc8e6b8, trim: 0xffffff, banner: 0x2f9e4f, tank: 0x2f9e4f },
   ],
   house: { x0: -5, x1: 5, z0: -3, z1: 3 },
 };
@@ -80,7 +80,7 @@ class Boss {
     this.pos = new THREE.Vector3(sp[0], sp[1], sp[2]); this.vel = new THREE.Vector3();
     this.yaw = sp[3]; this.pitch = 0.05;
     this.onGround = true; this.bob = 0; this.bobAmp = 0; this.stepT = 0; this.knockT = 0;
-    this.hp = 100; this.dizzy = 0; this.ko = false; this.out = false; this.stunT = 0;
+    this.hp = 100; this.dizzy = 0; this.ko = false; this.out = false; this.stunT = 0; this.crouch = 0;
     const f = layout.forts[team];
     this.bounds = { x0: f.x0 + 0.35, x1: f.x1 - 0.35, z0: f.z0 + 0.35, z1: f.z1 - 0.35 };
     this.stock = {}; for (const k in RULES) this.stock[k] = realtime ? (RT_STOCK[k] != null ? RT_STOCK[k] : Infinity) : RULES[k].stock;
@@ -120,12 +120,16 @@ class Boss {
     g.add(this.stars);
     this.game.scene.add(g);
   }
-  chest() { return new THREE.Vector3(this.pos.x, this.pos.y + 1.05, this.pos.z); }
-  headPos() { return new THREE.Vector3(this.pos.x, this.pos.y + 1.6, this.pos.z); }
+  // crouch 0..1: behind the parapet the boss is out of a straight shot
+  chest() { return new THREE.Vector3(this.pos.x, this.pos.y + 1.05 - 0.55 * this.crouch, this.pos.z); }
+  headPos() { return new THREE.Vector3(this.pos.x, this.pos.y + 1.6 - 0.8 * this.crouch, this.pos.z); }
+  setCrouch(want, dt) { const t = want ? 1 : 0; this.crouch += (t - this.crouch) * Math.min(1, dt * (want ? 6 : 14)); if (!want && this.crouch < 0.05) this.crouch = 0; }
   update(dt, t) {
     const g = this.model;
     g.position.copy(this.pos);
     g.rotation.set(0, this.yaw, 0);
+    g.scale.y = 1 - 0.45 * this.crouch;
+    this.stars.scale.y = 1 / g.scale.y;
     if (this.ko) { g.rotation.x = -Math.PI / 2 * 0.95; g.position.y += 0.2; }
     this.head.rotation.x = this.ko ? 0 : this.pitch * 0.6;
     const showStars = this.ko || this.dizzy > 0 || this.stunT > 0;
@@ -291,6 +295,7 @@ export class Duel {
 
   endTurn() {
     this.ai = null;
+    this.setCtrl(null);
     this.trajPts.visible = false;
     if (this.checkWin()) return;
     let next = this.turn;
@@ -549,6 +554,15 @@ export class Duel {
     if (!ai) return;
     ai.t += dt;
     const w = g.weapons[g.wi];
+    if (ai.phase === 'choose' && !ai.crewTried) {
+      // first, the henchmen (crate, repair, a trap); the boss shoots after
+      ai.crewTried = true;
+      if (this.crew.aiTurn(b.team)) { ai.phase = 'crew'; ai.t = 0; return; }
+    }
+    if (ai.phase === 'crew') {
+      if (this.crew.aiTurnDone(b.team) || ai.t > 14) { ai.phase = 'choose'; ai.t = 0.3; }
+      return;
+    }
     if (ai.phase === 'choose') {
       if (ai.t < 0.6) return;
       g.selectWeapon(this.aiPickWeapon(b), true);
@@ -625,8 +639,41 @@ export class Duel {
     if (this.stuckT > 1.5) { this.stuckT = 0; w.isDown = false; w.prep(); }
   }
 
+  // aiming = finger dragging the view lately, trigger held or zoom on: then the boss stands up
+  noteAim() {
+    const i = this.game.input, k = i.keys;
+    if (i.lookDX || i.lookDY || k.ArrowLeft || k.ArrowRight || k.ArrowUp || k.ArrowDown) this.lastAimT = performance.now();
+  }
+  onAimStart() { this.lastAimT = performance.now(); const b = this.boss; if (b) b.crouch = 0; }
+  wantsStand(bb) {
+    const g = this.game;
+    if (bb.ko || bb.out || bb.stunT > 0) return false;
+    if (this.isAI(bb.team)) { const ai = this.realtime ? bb.ai : this.ai; return !!ai && (ai.phase === 'turning' || ai.phase === 'hold' || (ai.phase === 'after' && ai.t < 0.8)); }
+    if (this.ctrl || this.aerial) return false;
+    const w = g.weapons && g.weapons[g.wi];
+    return (w && w.isDown) || g.zoomed || performance.now() - (this.lastAimT || 0) < 1300;
+  }
+  // turn mode: drive a henchman (or null = back to the boss)
+  setCtrl(c) {
+    const g = this.game;
+    if (c === this.ctrl) return;
+    if (this.ctrl) { this.ctrl.driven = false; this.ctrl.vel.x = 0; this.ctrl.vel.z = 0; }
+    this.ctrl = c || null;
+    if (c) {
+      c.driven = true; c.setTask(null); c.pitch = 0;
+      if (g.zoomed) g.toggleZoom(false);
+      const w = g.weapons[g.wi]; if (w && w.isDown) w.up();
+      if (this.aerial) this.crew.setAerial(false);
+    }
+    document.body.classList.toggle('driving', !!c);
+    this.crew.updateUI(true);
+    this.updateHUD(true);
+  }
+
   passTurn() {
+    if (this.state === 'retreat') { this.endTurn(); return; }
     if (this.realtime || this.state !== 'aim') return;
+    this.setCtrl(null);
     if (this.game.weapons[this.game.wi].isDown) this.game.weapons[this.game.wi].up();
     this.setState('flight');
   }
@@ -638,20 +685,24 @@ export class Duel {
     const g = this.game, t = performance.now() / 1000;
     this.stateT += rdt;
     const b = this.boss;
-    // bosses: active one takes input when it's a human aiming; all get physics (falls, knockback)
+    this.noteAim();
+    // bosses: the active one takes input when a human is playing it (not while driving a henchman); all get physics
+    const humanTurn = (this.state === 'aim' || this.state === 'retreat') && !this.isAI();
     for (const bb of this.bosses) {
       if (bb.knockT > 0) bb.knockT -= dt;
-      const active = bb === b && this.state === 'aim' && !this.isAI() && !bb.ko && !this.aerial;
+      const active = bb === b && humanTurn && !bb.ko && !this.aerial && !this.ctrl;
       g.player = bb;
       g.updatePlayer(dt, bb, active ? g.input : this.zeroInput, false);
+      // crouch: the boss ducks behind the parapet unless it is aiming; outside its turn it keeps its pose
+      if (bb === b && (this.state === 'aim' || this.state === 'retreat')) bb.setCrouch(!this.wantsStand(bb), dt);
       bb.update(dt, t);
     }
     g.player = b;
-    if (!this.isAI()) { g.input.lookDX = 0; g.input.lookDY = 0; }
     // weapons of the active boss
     for (const w of b.weapons) if (w.equipped) w.update(dt);
     this.watchdog(rdt);
     this.crew.update(dt, rdt);
+    if (!this.isAI()) { g.input.lookDX = 0; g.input.lookDY = 0; }
     // state machine
     switch (this.state) {
       case 'intro':
@@ -686,9 +737,17 @@ export class Duel {
       case 'settle': {
         const moving = g.physics.bodies.some(x => x.kind === 'chunk' && !x.sleeping && x.vel.lengthSq() > 2);
         const bossMoving = this.bosses.some(x => !x.onGround || x.knockT > 0);
-        if ((!moving && !bossMoving && this.stateT > 0.6) || this.stateT > 4) this.endTurn();
+        if ((!moving && !bossMoving && this.stateT > 0.6) || this.stateT > 4) {
+          // after a shot a human gets a few seconds to take cover before everything freezes
+          if (this.firedAny && !this.isAI() && !this.boss.ko && !this.result && !this.eliminated(this.turn)) { this.setState('retreat'); this.retreatT = 5; }
+          else this.endTurn();
+        }
         break;
       }
+      case 'retreat':
+        this.retreatT -= rdt;
+        if (this.retreatT <= 0) this.endTurn();
+        break;
     }
     if (this.impact) this.impact.t += rdt;
     if (this.bulletCam) this.bulletCam.t += rdt / 0.7;
@@ -708,8 +767,10 @@ export class Duel {
       if (bb.knockT > 0) bb.knockT -= dt;
       if (bb.stunT > 0) bb.stunT = Math.max(0, bb.stunT - rdt);
       const control = bb === me && live && !bb.ko && !bb.out && !(bb.stunT > 0) && !this.aerial;
+      if (bb === me) this.noteAim();
       g.player = bb;
       g.updatePlayer(dt, bb, control ? g.input : this.zeroInput, false);
+      if (live) bb.setCrouch(!this.wantsStand(bb), dt);
       bb.update(dt, t);
     }
     g.player = me;
@@ -809,6 +870,15 @@ export class Duel {
       wantPos.copy(b.headPos()).addScaledVector(fwd, 0.06);
       wantLook.copy(wantPos).addScaledVector(fwd, 10);
       rate = 40; fov = 70;
+    } else if (this.ctrl) {
+      // driving a henchman: camera behind him
+      const c = this.ctrl, head = c.headPos();
+      const fwd = new THREE.Vector3(-Math.sin(c.yaw) * Math.cos(c.pitch), Math.sin(c.pitch), -Math.cos(c.yaw) * Math.cos(c.pitch));
+      const right = new THREE.Vector3(Math.cos(c.yaw), 0, -Math.sin(c.yaw)), back = new THREE.Vector3(Math.sin(c.yaw), 0, Math.cos(c.yaw));
+      wantPos.copy(head).addScaledVector(right, 0.55).addScaledVector(back, 2.4); wantPos.y += 0.6 - c.pitch * 1.2;
+      const to = wantPos.clone().sub(head), tl = to.length(); to.divideScalar(tl);
+      const hb = g.world.raycast(head, to, tl); if (hb) wantPos.copy(head).addScaledVector(to, Math.max(0.35, hb.t - 0.25));
+      wantLook.copy(head).addScaledVector(fwd, 12); rate = 14; fov = 66;
     } else {
       this.shoulderCam(b, wantPos, wantLook);
       rate = st === 'transition' || st === 'skip' ? 3.2 : 16;
@@ -832,15 +902,30 @@ export class Duel {
     const scoped = (st === 'aim' || st === 'live') && g.zoomed;
     b.model.visible = !scoped && cam.position.distanceTo(b.headPos()) > 1.3;
     for (const w of b.weapons) if (w.equipped) w.model.visible = !scoped || !!w.anim;
-    $('cross').style.display = !this.aerial && ((st === 'aim' && !this.isAI()) || (st === 'live' && !b.ko && !b.out)) ? 'block' : 'none';
-    if (this.aerial) b.model.visible = true;
+    const myView = !this.aerial && !this.ctrl && ((st === 'aim' && !this.isAI()) || st === 'retreat' || (st === 'live' && !b.ko && !b.out));
+    $('cross').style.display = myView && b.crouch < 0.5 ? 'block' : 'none';
+    if (this.aerial || this.ctrl) b.model.visible = true;
+    // see-through walls: blocks between the camera and the boss (or henchman) on screen
+    this._ghT = (this._ghT || 0) - rdt;
+    if (this._ghT <= 0) {
+      this._ghT = 0.1;
+      const cells = [];
+      const who = this.ctrl || ((myView || (st === 'aim' && this.isAI())) ? b : null);
+      if (who && !this.aerial) {
+        const target = who.headPos(), o = cam.position, dir = target.clone().sub(o), len = dir.length(); dir.divideScalar(len);
+        g.world.traverse(o, dir, len + 0.2, c => { cells.push(c); return cells.length > 40; });
+        const f = cam.getWorldDirection(new THREE.Vector3());
+        g.world.traverse(o, f, len + 3.5, c => { cells.push(c); return cells.length > 80; });
+      }
+      g.world.setGhosts(cells);
+    }
   }
 
   updateTrajectory() {
     const g = this.game, b = this.boss, pts = this.trajPts;
     const w = g.weapons[g.wi];
     const aiming = this.realtime ? this.state === 'live' && !b.ko && !b.out : this.state === 'aim' && !(this.isAI() && this.diff !== 'facil');
-    const spec = aiming && !this.aerial && w.preview ? w.preview() : null;
+    const spec = aiming && !this.aerial && !this.ctrl && b.crouch < 0.5 && w.preview ? w.preview() : null;
     if (!spec) { pts.visible = false; return; }
     const pos = pts.geometry.attributes.position, n = pos.count;
     const dir = new THREE.Vector3(0, 0, -1).transformDirection(b.pivot.matrixWorld);
@@ -903,20 +988,23 @@ export class Duel {
         else if (b.stunT > 0) info = `TONTO! Volta em ${Math.ceil(b.stunT)} s`;
         else if (st !== Infinity) info = `Munição pesada: ${st}`;
       }
-    } else if (this.state === 'aim') {
+    } else if (this.state === 'retreat') info = `Se proteja! ${Math.ceil(this.retreatT)}`;
+    else if (this.ctrl) info = `Você está com o ${this.ctrl.name} · toque no chefe para voltar`;
+    else if (this.state === 'aim') {
       if (this.firedAny) info = `Tiros restantes neste turno: ${Math.max(0, this.turnShots)}`;
       else info = `${RULES[gw.id].shots} tiro${RULES[gw.id].shots > 1 ? 's' : ''} por turno · estoque ${st === Infinity ? '∞' : st}`;
     } else if (this.state === 'flight' || this.state === 'impact' || this.state === 'settle') info = 'Vendo o estrago…';
     $('turninfo').textContent = info;
     $('turninfo').style.display = info ? 'block' : 'none';
-    $('pass').style.display = !this.realtime && this.state === 'aim' && !this.isAI() ? 'flex' : 'none';
+    $('pass').style.display = !this.realtime && (this.state === 'aim' || this.state === 'retreat') && !this.isAI() ? 'flex' : 'none';
     // arsenal stock badges
     document.querySelectorAll('.wcard').forEach((c, i) => {
       if (!b.weapons[i]) return;
       const id = b.weapons[i].id, s = b.stock[id];
       const sp = c.querySelector('.stock');
-      if (sp && b.locked.has(id)) sp.textContent = 'trancada · vem nas caixas';
-      else if (sp) sp.textContent = this.realtime ? (s === Infinity ? '∞' : `x${s}`) : s === Infinity ? `${RULES[id].shots}/turno` : `x${s} · ${RULES[id].shots}/turno`;
+      c.classList.toggle('locked', b.locked.has(id));
+      if (sp) sp.textContent = b.locked.has(id) || s === Infinity ? '' : s;
+      if (false) sp.textContent = this.realtime ? (s === Infinity ? '∞' : `x${s}`) : s === Infinity ? `${RULES[id].shots}/turno` : `x${s} · ${RULES[id].shots}/turno`;
       c.classList.toggle('empty', s <= 0);
     });
   }

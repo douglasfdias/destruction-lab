@@ -261,7 +261,8 @@ export class World {
     win('f', 2, 9, 3, 3); win('f', (W >> 1) - 1, 9, 3, 3); win('f', W - 5, 9, 3, 3);
     win('l', 4, 2, 2, 3); win('r', 4, 9, 2, 3); win('l', D - 6 > 4 ? D - 6 : 6, 9, 2, 3); win('r', D - 6 > 4 ? D - 6 : 6, 2, 2, 3);
     // back door
-    for (let j = 1; j <= 4; j++) for (let a = 5; a <= 6; a++) S(a, j, D - 1, MAT.WOOD, 0x8a5a32);
+    for (let j = 1; j <= 4; j++) for (let a = 5; a <= 6; a++) S(a, j, D - 1, 0, null);
+    for (const a of [4, 7]) for (let j = 1; j <= 4; j++) S(a, j, D - 1, MAT.WOOD, 0x8a5a32);
     // team banner stripe on the parapet, on the front
     for (let a = 2; a <= W - 3; a++) S(a, 15, 0, MAT.PLASTER, f.banner);
     // wooden water-tank tower on the roof, back corner on the boss's left (never blocks the over-the-shoulder camera)
@@ -285,14 +286,14 @@ export class World {
     const wallZ = (x, za, zb, gap = 0.7) => { for (let k = this.ck(za); k <= this.ck(zb); k++) { const z = OZ + (k + 0.5) * VOX; if (Math.abs(z - (za + zb) / 2) < gap) continue; for (let j = 0; j <= 2; j++) this.set(this.ci(x), j, k, MAT.CONCRETE, 0xb0aea8, false); } };
     if (layout.forts.length === 3) {
       // a low barricade in front of each fort, crates around the middle, a shed to the south
-      wallX(-4, 4, 9);
-      wallZ(-7.5, -11, -5); wallZ(7.5, -11, -5);
+      wallX(-4, 4, 8);
+      wallZ(-6.3, -9, -3); wallZ(6.3, -9, -3);
       crate(-3, -1.5, 2); crate(-2, -1.5, 1); crate(3, -0.5, 2); crate(4, -0.7, 1); crate(-0.5, 4.5, 1); crate(12.5, 11, 2); crate(-12.5, 11, 1);
       shed(-1.5, 1.5, -15, -13, true);
     } else {
       // mid-field cover: low concrete barricade with a gap, stacked crates, a little wooden shed
       wallX(-4, 4, -2);
-      crate(-5.5, 4.5, 2); crate(-4.5, 4.5, 1); crate(5, -8, 2); crate(6, -8.2, 1); crate(4.6, 5.4, 1);
+      crate(-5.5, 2.5, 2); crate(-4.5, 2.5, 1); crate(5, -6.5, 2); crate(6, -6.7, 1); crate(4.6, 3.2, 1);
       shed(9, 12, -6, -4, true);
     }
     this.totalHouse = 0; this.removedHouse = 0; this.teamTotal = [0, 0, 0]; this.teamRemoved = [0, 0, 0];
@@ -304,6 +305,8 @@ export class World {
 
   // ---------- rendering ----------
   buildMeshes(quality) {
+    if (this.ghosted) this.ghosted.clear();
+    if (this.ghostMesh) this.ghostMesh.count = 0;
     for (const m of this.meshes) if (m) { this.scene.remove(m); m.geometry.dispose(); }
     this.meshes = []; this.instCell = []; this.damageAttr = [];
     const counts = new Array(NMAT).fill(0);
@@ -349,6 +352,36 @@ export class World {
   }
 
   setShadows(on) { for (let m = 1; m < NMAT; m++) if (this.meshes[m]) this.meshes[m].castShadow = on && m !== MAT.GLASS; }
+
+  // ---------- see-through walls: blocks between the camera and the boss are drawn as faint glass ----------
+  setGhosts(cells) {
+    if (!this.ghosted) this.ghosted = new Set();
+    if (!this.ghostMesh) {
+      const gm = this.ghostMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(VOX, VOX, VOX), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2, depthWrite: false }), 96);
+      gm.count = 0; gm.frustumCulled = false; gm.renderOrder = 3; gm.setColorAt(0, new THREE.Color(1, 1, 1));
+      this.scene.add(gm);
+    }
+    const keep = new Set(cells), v = this._v, M = this._m;
+    for (const c of [...this.ghosted]) if (!keep.has(c)) {
+      this.ghosted.delete(c);
+      const m = this.mat[c], n = this.inst[c];
+      if (m && n >= 0 && this.meshes[m]) { cellCenter(c, v); M.makeTranslation(v.x, v.y, v.z); this.meshes[m].setMatrixAt(n, M); this.meshes[m].instanceMatrix.needsUpdate = true; }
+    }
+    for (const c of cells) {
+      if (this.ghosted.has(c) || this.ghosted.size >= 96) continue;
+      const m = this.mat[c], n = this.inst[c];
+      if (!m || n < 0 || !this.meshes[m] || m === MAT.GLASS) continue;
+      this.ghosted.add(c);
+      M.makeTranslation(0, -500, 0); this.meshes[m].setMatrixAt(n, M); this.meshes[m].instanceMatrix.needsUpdate = true; // parked far below (a zero-size box breaks the shadow pass)
+    }
+    const gm = this.ghostMesh; let k = 0;
+    for (const c of this.ghosted) {
+      if (!this.mat[c]) continue;
+      cellCenter(c, v); M.makeTranslation(v.x, v.y, v.z); gm.setMatrixAt(k, M);
+      this._c.setHex(this.tint[c]); gm.setColorAt(k, this._c); k++;
+    }
+    gm.count = k; gm.instanceMatrix.needsUpdate = true; if (gm.instanceColor) gm.instanceColor.needsUpdate = true;
+  }
 
   _removeInstance(c) {
     const m = this.mat[c], mesh = this.meshes[m];

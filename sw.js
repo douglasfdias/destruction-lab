@@ -1,6 +1,6 @@
 // Offline support for the installed web app (GitHub Pages).
 // Network first, so a new version shows up as soon as it is online; the cache is the fallback when offline.
-const CACHE = 'dlab-v10';
+const CACHE = 'dlab-v11';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './lib/three.module.min.js',
   './js/main.js', './js/world.js', './js/physics.js', './js/terrain.js', './js/fx.js', './js/audio.js', './js/textures.js', './js/weapons.js', './js/sfx.js', './js/duel.js', './js/crew.js'];
 // cache: 'reload' skips the browser's HTTP cache, so the new version is not filled with old files

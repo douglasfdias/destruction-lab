@@ -29,6 +29,20 @@ const QUALITY = {
   alta: { name: 'Alta', pr: 2, shadows: true, shadowSize: 2048, maxBodies: 320, maxFrozen: 5000, maxParticles: 2200, maxChips: 800, debris: 90, fx: 1 },
 };
 
+// weapon icons (24x24 strokes)
+const WICON = {
+  pedra: '<path d="M5 15l3-7 7-2 5 6-3 7H8z"/>',
+  estilingue: '<path d="M12 22v-9M12 13L6 4M12 13l6-9M6 4h12"/>',
+  pistola: '<path d="M3 8h17v4H11l-1 7H6l1-7H3z"/>',
+  smg: '<path d="M2 9h18v3H9v7H6v-7H2zM12 12v5M20 9v-2"/>',
+  shotgun: '<path d="M1 10h22M1 13h15l-3 5H9"/>',
+  rifle50: '<path d="M1 12h22M5 12v4M9 9h5M18 12v-3"/>',
+  granada: '<circle cx="11" cy="14" r="6"/><path d="M11 8V5h4"/>',
+  canhao: '<path d="M4 14l14-7 2 4-13 6z"/><circle cx="8" cy="18" r="3"/>',
+  rpg: '<path d="M3 15l14-8 3 3-14 8zM17 7l4-2M6 18l-2 3"/>',
+};
+const weaponIcon = (id, s = 24) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${WICON[id] || ''}</svg>`;
+
 class Game {
   constructor() {
     this.qKey = this.loadPref('quality', 'media');
@@ -176,11 +190,11 @@ class Game {
       roof.position.set(x, h + 0.2, z); roof.rotation.y = rot; bg.add(roof);
     };
     // across the street (behind the player)
-    for (let x = -60; x <= 60; x += R(9, 13)) place(x, R(30, 36), R(7, 11), R(8, 12), R(8, 22));
+    for (let x = -66; x <= 66; x += R(9, 13)) place(x, R(37, 43), R(7, 11), R(8, 12), R(8, 22));
     // behind the lot
-    for (let x = -60; x <= 60; x += R(10, 15)) place(x, R(-38, -46), R(8, 13), R(8, 12), R(10, 30));
+    for (let x = -66; x <= 66; x += R(10, 15)) place(x, R(-46, -54), R(8, 13), R(8, 12), R(10, 30));
     // sides
-    for (let z = -30; z <= 0; z += R(10, 14)) { place(R(-38, -44), z, R(8, 12), R(8, 12), R(7, 16)); place(R(26, 32), z, R(8, 12), R(8, 12), R(7, 16)); }
+    for (let z = -36; z <= 6; z += R(10, 14)) { place(R(-44, -50), z, R(8, 12), R(8, 12), R(7, 16)); place(R(36, 42), z, R(8, 12), R(8, 12), R(7, 16)); }
     s.add(bg);
     // trees
     const trunkG = new THREE.CylinderGeometry(0.15, 0.22, 2.4, 6); trunkG.translate(0, 1.2, 0);
@@ -1184,7 +1198,7 @@ class Game {
 
   fireDown(fromAI = false) {
     if (!this.started || this.arsenalOpen) return;
-    if (this.duel) { if (this.duel.isAI() !== fromAI) return; if (!this.duel.canFire()) return; }
+    if (this.duel) { if (this.duel.ctrl) return; if (this.duel.isAI() !== fromAI) return; if (!this.duel.canFire()) return; this.duel.onAimStart(); }
     this.audio.resume(); this.weapons[this.wi].down();
   }
   fireUp(fromAI = false) { if (this.duel && this.duel.isAI() !== fromAI) return; this.weapons[this.wi].up(); }
@@ -1229,12 +1243,14 @@ class Game {
   buildHUD() {
     const lvColors = ['#8BD3E6', '#9BE36B', '#FFC531', '#FF8A2A', '#FF4D4D', '#C77DFF'];
     this.lvColors = lvColors;
-    const grid = $('arsenal-grid');
+    // weapons as icons: a small 3x3 grid that opens under the weapon button (the name shows up top when you pick one)
+    const grid = $('wgrid');
     this.weapons.forEach((w, i) => {
       const b = document.createElement('button');
-      b.className = 'wcard';
-      b.innerHTML = `<span class="badge" style="background:${lvColors[w.level - 1]}">NÍVEL ${w.level}</span><span class="wname">${w.name}</span><span class="stock"></span><span class="wkey">${i + 1}</span>`;
-      b.addEventListener('click', () => { this.selectWeapon(i); this.closeArsenal(); });
+      b.className = 'wcard'; b.setAttribute('aria-label', w.name); b.title = w.name;
+      b.innerHTML = weaponIcon(w.id, 24) + '<span class="stock"></span>';
+      const pick = e => { e.stopPropagation(); if (e.type === 'touchstart') e.preventDefault(); this.selectWeapon(i); this.closeArsenal(); };
+      b.addEventListener('click', pick); b.addEventListener('touchstart', pick, { passive: false });
       grid.appendChild(b);
     });
     // touchstart (not click): phones don't send clicks while another finger is down, e.g. on the joystick
@@ -1358,26 +1374,33 @@ class Game {
     } catch (e) {}
   }
 
-  openArsenal() { $('arsenal-panel').style.display = 'flex'; this.arsenalOpen = true; }
-  closeArsenal() { $('arsenal-panel').style.display = 'none'; this.arsenalOpen = false; }
+  openArsenal() { const g = $('wgrid'); const open = g.style.display !== 'grid'; g.style.display = open ? 'grid' : 'none'; }
+  closeArsenal() { $('wgrid').style.display = 'none'; this.arsenalOpen = false; }
 
   updateWeaponCard() {
     const w = this.weapons[this.wi];
     $('wlevel').textContent = 'NÍVEL ' + w.level;
     $('wlevel').style.background = this.lvColors[w.level - 1];
     $('wname').textContent = w.name;
+    $('wicon').innerHTML = weaponIcon(w.id, 26);
     $('zoom').style.display = 'flex';
     document.querySelectorAll('.wcard').forEach((b, i) => b.classList.toggle('on', i === this.wi));
+    if (this._lastWid !== undefined && this._lastWid !== w.id) this.notice(w.name);
+    this._lastWid = w.id;
   }
 
+  // short notices: one thin line at the top, two at most, they fade on their own
   toast(text) {
+    const box = $('toasts');
+    if (box.lastChild && box.lastChild.dataset.t === text) return;
     const el = document.createElement('div');
-    el.className = 'toast'; el.textContent = text;
-    $('toasts').appendChild(el);
-    setTimeout(() => el.classList.add('out'), 1600);
+    el.className = 'toast'; el.textContent = text; el.dataset.t = text;
+    box.appendChild(el);
+    setTimeout(() => el.classList.add('out'), 1700);
     setTimeout(() => el.remove(), 2200);
-    while ($('toasts').children.length > 3) $('toasts').firstChild.remove();
+    while (box.children.length > 2) box.firstChild.remove();
   }
+  notice(text) { this.toast(text); }
 
   floater(v, pos) {
     const el = document.createElement('div');
